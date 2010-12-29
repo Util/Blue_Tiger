@@ -1,0 +1,116 @@
+Miscellaneous Attribute Decoration (MAD) is a road not taken by Blue Tiger.
+MAD is not directly relevant to Blue Tiger, but since I had a lot of notes
+from researching this approach (before rejecting it), I am making them
+available here.
+
+If you want to play with MAD, I suggest that you compile your own Perl 5.10.0
+source, since that version should be most compatible (no bitrot w.r.t. MAD).
+
+http://use.perl.org/articles/06/04/20/0832226.shtml
+    MAD is the process of hanging sufficient information off the op-tree to be
+    able to recover the source code afterwards. Up until now, the compilation
+    phase has simply been required to produce bytecode for the run-time
+    interpreter, and it's usually impossible to figure out by inspecting the
+    bytecode to figure out what the original Perl source would have looked
+    like (think: peep-hole optimisations).
+
+    Being able to go from source code to bytecode back to source code is an
+    important step in getting Perl 6 to run Perl 5 code).
+
+http://search.cpan.org/~miyagawa/perl/pod/perl5100delta.pod#MAD
+    MAD, which stands for Miscellaneous Attribute Decoration, is a
+    still-in-development work leading to a Perl 5 to Perl 6 converter. To
+    enable it, it's necessary to pass the argument -Dmad to Configure. The
+    obtained perl isn't binary compatible with a regular perl 5.10, and has
+    space and speed penalties; moreover not all regression tests still pass
+    with it. (Larry Wall, Nicholas Clark)
+
+http://perl5.git.perl.org/metaconfig.git/blob/HEAD:/U/perl/mad.U
+    Would you like to build with Misc Attribute Decoration? This is
+    development work leading to a Perl 5 to Perl 6 convertor, which imposes a
+    space and speed overhead on the interpreter.
+
+http://search.cpan.org/~rurban/B-C-1.27/perloptree.pod#MAD
+    MAD stands for "Misc Attributed Data".
+
+    Larry Wall worked on a new MAD compiler backend outside of the B approach,
+    dumping the internal op tree representation as XML, not as tree of perl B
+    objects.
+
+    The idea is that all the information needed to recreate the original
+    source is stored in the op tree. To do this the tokens for the ops are
+    associated with ops, these madprops are a list of key-value pairs, where
+    the key is a character as listed at the end of op.h, the value normally is
+    a string, but it might also be a op, as in the case of a optimized op
+    ('O'). Special for the whitespace key '_' (whitespace before) and '#'
+    (whitespace after), which indicate the whitespace or comment before/after
+    the previous key-value pair.
+
+    Also when things normally compiled out, like a BEGIN block, which normally
+    do not results in any ops, instead create a NULLOP with madprops used to
+    recreate the object.
+
+    Is there any documentation on this?
+
+    Why this awful XML and not the rich tree of perl objects?
+
+    Well there's an advantage. The MAD XML can be seen as some kind of XML
+    Storable/Freeze of the B op tree, and can be therefore converted outside
+    of the CHECK block, which means you can actually debug the conversion (=
+    compilation) process. This is not possible within the CHECK block in the B
+    backends.
+
+http://www.nntp.perl.org/group/perl.perl5.porters/2006/03/msg110539.html
+    Larry's Perl 5 to Perl 5 convertor - nntp.perl.org
+    I've merged all of Larry's Perl 5 to Perl 5 convertor work into blead.
+    This was somewhat evil as it was against 5.9.2, and rather a lot has happened
+    since then. It's conditionally compiled in if you Configure with -Dmad
+    (MAD stands for Misc Attribute Decoration)
+
+    It's not all working quite yet and I'm not sure why.
+    --snip--
+    So basically I'm stuck on how I've fouled up the tokeniser such that I can't
+    get XML out. It seems that as soon as PL_madskills is non-zero it goes boom.
+
+http://www.nntp.perl.org/group/perl.perl5.porters/2006/03/msg110560.html
+    From: Nicholas Clark
+    Date: March 10, 2006 11:20
+    Subject: MAD works (was Re: debugging yacc (was Re: Larry's Perl 5 to Perl 5 convertor))
+    I started on trying to take the diff from 5.9.2's perly.y to madly.y and
+    using that to convert blead's perly.y to madly.y, as a random guess.
+    Larry mailed me directly about 15 minutes after I started to say that
+    (effectively) this was what was needed. So I kept going.
+
+    After rather a lot more 3 way diff merging than I like, it now works.
+    [Yesterday toke.c, today madly.y tomorrow the world^W^Wtime off]
+    [Mmm, you don't know how much you rely on patch until the diffs get too complex
+    for it to apply. Thanks Larry, for something else that's really rather useful.]
+
+    Anyway, finally, now if you sync blead and build with -Dmad you can do this:
+--snip--
+    I claim "weekend". Anyone else is welcome to play with p55 and nomad inside
+    mad/ and send patches to tidy the hard coded directories.
+    Oh, and patch madly.y to cope with given/when/break, Rafael's require
+    tokenisation changes, the new array slice deref syntax, and anything else that
+    changed since the release of 5.9.2.
+
+http://www.nntp.perl.org/group/perl.perl5.porters/2006/04/msg111890.html
+    On Mon, Apr 17, 2006 at 04:59:56AM -0700, Yitzchak Scott-Thoennes wrote:
+    > By "cope with", do you mean do something more than just what perly.y does?
+
+    Well, I'm not completely sure what needs doing. But the pattern I could see
+    in the code changes was that Larry replaced every op_free with some form of
+    call to the MAD code to save the OP. My understanding being that every
+    intermediate OP that is freed is effectively throwing away some information
+    about the source code, hence to recreate the byte-perfect original source
+    code (rather than a deparse-equivalent version) that information needs to be
+    kept.
+
+    Larry's work was up-to-date with (IIRC) released 5.9.2. But since then there
+    have been several changes to syntax which have also meant changes to the
+    optree generation, which in turn means that there are new places that call
+    op_free(). So I don't think that MAD will work properly on recreating any
+    script that uses any of the new syntax, because not all information will be
+    preserved. So by "cope with" I meant making whatever changes are needed to
+    the new op_free() calls to properly record information using MAD, so that
+    it can be output in the XML dump.
