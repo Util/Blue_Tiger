@@ -1,0 +1,15 @@
+F.A.Q. - Fervently Anticipated Questions
+(This package is too new for anyone to have actually asked yet.)
+
+Q:  Is this the "official" Perl5-to-Perl6 translator?
+A:  No, this is a "tinkertoy" project of one of the Perl 6 developers.
+    However, it might still be the best translator for your needs.
+
+Q:  Well, then where *is* the "official" Perl5-to-Perl6 translator?
+A:  There isn't one (yet?). The one that Larry Wall is working on (called MAD)
+    does not yet emit Perl 6 output. See Notes/mad.txt for more details.
+A:  According to Larry at YAPC 2010, the only thing that will be "official"
+    in the Perl 6 ecosystem is the language specification and its test suite.
+    Everything else is free to have multiple designs, implementations, etc.
+    I had asked specifically because he had claimed the translator project for
+    himself several years ago, and I did not want to step on any toes.
