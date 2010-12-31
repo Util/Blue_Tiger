@@ -1,0 +1,48 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use PPI;
+use PPI::Dumper; # XXX Bug in documentation of PPI::Dumper - must 'use' it separately - bug in doc, or bug that it is supposed to auto-work?
+use Getopt::Long;
+
+# This program is a development aid for Blue Tiger.
+# It parses a piece of Perl code with PPI, then dumps the structure to STDOUT.
+
+my $USAGE = <<'END_OF_USAGE';
+Usage:  ppi_dump [--nocontent] [--whitespace] file.pl
+        ppi_dump [--nocontent] [--whitespace] 'quoted-perl-code'
+END_OF_USAGE
+
+GetOptions(
+    'content|c'     => \( my $content    = 1 ),
+    'whitespace|w'  => \( my $whitespace = 0 ),
+) or die $USAGE;
+
+die $USAGE if @ARGV != 1;
+my ( $program_arg ) = @ARGV;
+
+# The program can either take a filename, or quoted perl code.
+# XXX Change to a -e option for quoted perl code, like for one-liners?
+my $PPI_doc;
+if ( $program_arg =~ m{\A\S+\z}msx and -s $program_arg ) {
+    my $perl_filename = $program_arg;
+    if ( not -e $perl_filename ) {
+        die 'Your argument contained no whitespace, and so was interpreted'
+          . " as a filename, but no file of the name '$perl_filename' exists!";
+    }
+    $PPI_doc = PPI::Document->new( $perl_filename );
+}
+else {
+    my $perl_source_code = $program_arg;
+    $PPI_doc = PPI::Document->new( \$perl_source_code );
+}
+die "Could not generate PPI from input '$program_arg'" if !defined $PPI_doc;
+
+
+my $Dumper = PPI::Dumper->new(
+    $PPI_doc,
+    content    => $content,
+    whitespace => $whitespace,
+) or die;
+
+$Dumper->print;
