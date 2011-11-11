@@ -152,6 +152,14 @@ sub _translate_all_ops {
             my @p6_ops = @{$p6_op};
             my $default_op = $p6_ops[0];
 
+            my $possible_ops = join ', ', map { "'$_'" } @p6_ops;
+            $self->log_warn(
+                $op,
+                "op '$p5_op' was"
+               . " changed to '$default_op', but could have been"
+               . " any of ( $possible_ops ). Verify the context!\n"
+            );
+
             $op->set_content( $default_op );
             $change_count++;
         }
