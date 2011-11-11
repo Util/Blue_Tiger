@@ -80,3 +80,15 @@ $x = $y +> $z;
 # Warn:
 At line 1, position 9, op '>>' was changed to '+>', but could have been any of ( '+>', '~>' ). Verify the context!
 #---
+# Name: Match binding becomes smart match
+# In:
+$x =~ /re/;
+# Out:
+$x ~~ /re/;
+#---
+# Name: Negated match binding becomes negated smart match
+# In:
+$x !~ /re/;
+# Out:
+$x !~~ /re/;
+#---
