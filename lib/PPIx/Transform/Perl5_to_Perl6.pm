@@ -127,6 +127,24 @@ my %ops_translation = (
 
     '=~'  =>   '~~',
     '!~'  =>   '!~~',
+
+    # Bitwise ops
+    # http://perlcabal.org/syn/S03.html#Changes_to_Perl_5_operators
+    #   Bitwise operators get a data type prefix: +, ~, or ?.
+    #   For example, Perl 5's | becomes either +| or ~| or ?|, depending
+    #   on whether the operands are to be treated as numbers, strings,
+    #   or boolean values.
+    # In Perl 5, the choice of whether to treat the operation as numeric or
+    # string depended on the data; In Perl 6, it depends on the operator.
+    # Note that Perl 6 has a short-circuiting xor operator, (^^). Since Perl 5
+    # had no equivalent operator, nothing should translate to ^^, but we might
+    # spot code that could advise the user to inspect for a ^^ opportunity.
+    # Note that Perl 5 has separate ops for prefix versus infix xor
+    # (~ versus ^). Perl 6 uses typed ^ for both prefix and infix.
+    '|'   => [ '+|', '~|', '?|' ], # bitwise or  ( infix)
+    '&'   => [ '+&', '~&', '?&' ], # bitwise and ( infix)
+    '^'   => [ '+^', '~^', '?^' ], # bitwise xor ( infix)
+    '~'   => [ '+^', '~^', '?^' ], # bitwise not (prefix)
 );
 
 # Returns number of changes, 0 if not changes, undef on error.

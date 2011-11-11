@@ -32,3 +32,35 @@ _private_sub(123_456_789);
 # Out:
 _private_sub(123_456_789);
 #---
+# Name: The bitwise or  (|) becomes a specific bitwise or.
+# In:
+$x = $y | $z;
+# Out:
+$x = $y +| $z;
+# Warn:
+At line 1, position 9, op '|' was changed to '+|', but could have been any of ( '+|', '~|', '?|' ). Verify the context!
+#---
+# Name: The bitwise and (&) becomes a specific bitwise and.
+# In:
+$x = $y & $z;
+# Out:
+$x = $y +& $z;
+# Warn:
+At line 1, position 9, op '&' was changed to '+&', but could have been any of ( '+&', '~&', '?&' ). Verify the context!
+#---
+# Name: The bitwise xor (^) becomes a specific bitwise xor.
+# In:
+$x = ^ $z;
+# Out:
+$x = +^ $z;
+# Warn:
+At line 1, position 6, op '^' was changed to '+^', but could have been any of ( '+^', '~^', '?^' ). Verify the context!
+#---
+# Name: The bitwise not (~) becomes a specific bitwise not.
+# In:
+$x = $y ~ $z;
+# Out:
+$x = $y +^ $z;
+# Warn:
+At line 1, position 9, op '~' was changed to '+^', but could have been any of ( '+^', '~^', '?^' ). Verify the context!
+#---
