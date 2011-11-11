@@ -83,9 +83,12 @@ for my $test_aref (@tests) {
     my $actual_warn = join '', @warnings;
     chomp $actual_warn;
 
-    is_deeply(
-        { OUT => $actual_out, WARN => $actual_warn }, # Actual
-        { OUT => $t{OUT},     WARN => $t{WARN}     }, # Expected
-        $t{NAME},
-    );
+    my %actual   = ( OUT => $actual_out, WARN => $actual_warn );
+    my %expected = ( OUT => $t{OUT},     WARN => $t{WARN}     );
+
+    is_deeply( \%actual, \%expected, $t{NAME} ) or do {
+        note explain( 'Original: ' => $t{IN} );
+        note explain( 'Expected: ' => \%expected );
+        note explain(   'Actual: ' => \%actual );
+    }
 }
