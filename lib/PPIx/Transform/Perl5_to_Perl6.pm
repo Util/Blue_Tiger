@@ -148,6 +148,13 @@ sub _translate_all_ops {
             $op->set_content( $p6_op );
             $change_count++;
         }
+        elsif ( _ARRAY($p6_op) ) {
+            my @p6_ops = @{$p6_op};
+            my $default_op = $p6_ops[0];
+
+            $op->set_content( $default_op );
+            $change_count++;
+        }
         else {
             croak "Don't know how to handle xlate of op '$p5_op' (is the entry in %ops_translation misconfigured?)";
         }
