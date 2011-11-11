@@ -121,7 +121,7 @@ sub _translate_all_ops {
     my $ops_aref = $PPI_doc->find( 'PPI::Token::Operator' )
         or return 0;
 
-    my $change_count;
+    my $change_count = 0;
     for my $op ( @{$ops_aref} ) {
         my $p5_op = $op->content;
 
