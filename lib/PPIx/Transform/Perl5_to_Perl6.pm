@@ -182,7 +182,8 @@ sub _translate_all_ops {
             $change_count++;
         }
         else {
-            carp "Don't know how to handle xlate of op '$p5_op' (is the entry in %ops_translation misconfigured?)";
+            carp "Don't know how to handle xlate of op '$p5_op'"
+               . " (is the entry in %ops_translation misconfigured?)";
         }
     }
 
