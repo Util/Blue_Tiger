@@ -1,0 +1,45 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use Getopt::Long;
+use lib 'lib';
+use PPIx::Transform::Perl5_to_Perl6;
+
+=begin comments
+
+TODO
+Obviously, many options will be added in the future.
+Add a config file option.
+
+=end comments
+
+=cut
+
+my $USAGE = <<'END_OF_USAGE';
+Usage:
+    p526 [-h|--help] path/to/some_perl_5_program.pl
+    This program is the main command-line app for the Blue Tiger translator.
+    It translates Perl 5 source code into Perl 6.
+END_OF_USAGE
+
+GetOptions(
+    'help|h' => \( my $opt_help ),
+) or die $USAGE;
+
+print $USAGE and exit(0) if $opt_help;
+
+die $USAGE if @ARGV != 1;
+my ($script_path) = @ARGV;
+
+my $PPI_doc = PPI::Document->new($script_path)
+    or die "Cannot make a PPI::Document from '$script_path': $!";
+
+my $xlate = PPIx::Transform::Perl5_to_Perl6->new(
+) or die "Failed to create new xlate";
+
+$xlate->apply($PPI_doc)
+    or die "Failed to apply";
+
+my $got_code_out = $PPI_doc->serialize;
+
+print $got_code_out;
