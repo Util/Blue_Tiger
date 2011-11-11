@@ -79,7 +79,7 @@ for my $test_aref (@tests) {
 
     my $actual_out  = $PPI_doc->serialize;
 
-    is_deeply( 
+    is_deeply(
         { OUT => $actual_out },
         { OUT => $t{OUT}     },
         $t{NAME},

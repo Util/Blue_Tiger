@@ -83,7 +83,7 @@ sub document {
     #    or may die if there is a critical error in the apply handler.
     # but if the transform *is* applied without error, and no change happens as a result, then apply() incorrectly returns undef.
     return 1 if defined $change_count and $change_count == 0;
-    
+
     return $change_count;
 }
 

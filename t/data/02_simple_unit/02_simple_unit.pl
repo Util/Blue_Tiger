@@ -9,7 +9,7 @@
 #    the underscore, the underscore had no meaning but the dollar sign, at and
 #    percent all mean what they did before, except when they don't.  The arrow
 #    means a sub, angle brackets are iterators except when they're comparators,
-#    but they're never globs, except when you're iterating over filenames. 
+#    but they're never globs, except when you're iterating over filenames.
 #    Every block is a closure, every closure can be prebound, and there are a
 #    couple of dozen types of context, including hyperoperated.
 
