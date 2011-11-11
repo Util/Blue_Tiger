@@ -1,10 +1,19 @@
 package PPIx::Transform::Perl5_to_Perl6;
 use strict;
 use warnings;
-use Carp         qw( croak );
+use Carp         qw( carp croak );
 use Scalar::Util qw( blessed );
-use Params::Util qw( _INSTANCE _ARRAY _STRING );
+use Params::Util qw( _INSTANCE _ARRAY _ARRAY0 _STRING );
 use base 'PPI::Transform';
+
+BEGIN {
+    # Before 1.204_03, PPI::Transform silently threw away all params to new().
+    use PPI::Transform 1.204 ();
+    my $ver = $PPI::Transform::VERSION;
+    if ( $ver eq '1.204_01' or $ver eq '1.204_02' ) {
+        die "PPI::Transform version 1.204_03 required--this is only version $ver";
+    }
+}
 
 =head1 NAME
 
@@ -64,8 +73,15 @@ Currently handles:
 
 
 # Scaffolding to allow us to work as a PPI::Transform.
+my %optional_initializer = map { $_ => 1 } qw( WARNING_LOG );
 sub new {
     my $self = shift->SUPER::new(@_);
+
+    my $bad = join "\n\t",
+              grep { !$optional_initializer{$_} }
+              sort keys %{$self};
+    carp "Unexpected initializer keys are being ignored:\n$bad\n " if $bad;
+
     return $self;
 }
 
@@ -138,6 +154,38 @@ sub _translate_all_ops {
     }
 
     return $change_count;
+}
+
+sub log_warn {
+    my ( $self, $loc, @message_parts ) = @_;
+    my $message = join '', @message_parts;
+
+    # $loc indicates the location where the warning or error occurred.
+    # It could be an object that provides a location method,
+    # or a hand-constructed location aref, or undef.
+    my @location
+        = !$loc                           ? ()
+        : _ARRAY($loc)                    ? @{ $loc             }
+        : _INSTANCE($loc, 'PPI::Element') ? @{ $loc->location() }
+        : croak("Unknown type passed as location object: ".ref($loc))
+        ;
+
+    if (@location) {
+        # Before PPI-1.204_05, ->location() only returned 3 elements.
+        my ( $line, $rowchar, $col, $logical_line, $logical_file_name ) = @location;
+
+        my $pos = $rowchar eq $col ? $col : "$rowchar/$col";
+
+        $message = "At line $line, position $pos, " . $message;
+    }
+
+    my $log_aref = $self->{WARNING_LOG};
+    if ( _ARRAY0($log_aref) ) {
+        push @{$log_aref}, $message;
+    }
+    else {
+        carp $message;
+    }
 }
 
 1;

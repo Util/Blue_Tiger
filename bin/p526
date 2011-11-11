@@ -34,7 +34,9 @@ my ($script_path) = @ARGV;
 my $PPI_doc = PPI::Document->new($script_path)
     or die "Cannot make a PPI::Document from '$script_path': $!";
 
+my @warnings;
 my $xlate = PPIx::Transform::Perl5_to_Perl6->new(
+    WARNING_LOG => \@warnings,
 ) or die "Failed to create new xlate";
 
 $xlate->apply($PPI_doc)
@@ -42,4 +44,4 @@ $xlate->apply($PPI_doc)
 
 my $got_code_out = $PPI_doc->serialize;
 
-print $got_code_out;
+print $got_code_out, "\n", join("\n", @warnings), "\n";

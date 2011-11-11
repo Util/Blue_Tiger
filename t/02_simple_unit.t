@@ -71,17 +71,21 @@ for my $test_aref (@tests) {
     my $PPI_doc = PPI::Document->new( \$t{IN} ) or die;
 #require PPI::Dumper; PPI::Dumper->new( $PPI_doc )->print;
 
+    my @warnings;
     my $xlate = PPIx::Transform::Perl5_to_Perl6->new(
+        WARNING_LOG => \@warnings,
     ) or die;
 
     $xlate->apply($PPI_doc)
         or die "Failed to apply xlate to PPI_doc: $t{IN}";
 
     my $actual_out  = $PPI_doc->serialize;
+    my $actual_warn = join '', @warnings;
+    chomp $actual_warn;
 
     is_deeply(
-        { OUT => $actual_out },
-        { OUT => $t{OUT}     },
+        { OUT => $actual_out, WARN => $actual_warn }, # Actual
+        { OUT => $t{OUT},     WARN => $t{WARN}     }, # Expected
         $t{NAME},
     );
 }
