@@ -64,3 +64,19 @@ $x = $y +^ $z;
 # Warn:
 At line 1, position 9, op '~' was changed to '+^', but could have been any of ( '+^', '~^', '?^' ). Verify the context!
 #---
+# Name: The bitwise shift left
+# In:
+$x = $y << $z;
+# Out:
+$x = $y +< $z;
+# Warn:
+At line 1, position 9, op '<<' was changed to '+<', but could have been any of ( '+<', '~<' ). Verify the context!
+#---
+# Name: The bitwise shift right
+# In:
+$x = $y >> $z;
+# Out:
+$x = $y +> $z;
+# Warn:
+At line 1, position 9, op '>>' was changed to '+>', but could have been any of ( '+>', '~>' ). Verify the context!
+#---

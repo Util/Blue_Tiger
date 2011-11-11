@@ -145,6 +145,9 @@ my %ops_translation = (
     '&'   => [ '+&', '~&', '?&' ], # bitwise and ( infix)
     '^'   => [ '+^', '~^', '?^' ], # bitwise xor ( infix)
     '~'   => [ '+^', '~^', '?^' ], # bitwise not (prefix)
+
+    '<<'  => [ '+<', '~<' ], # bitwise shift left
+    '>>'  => [ '+>', '~>' ], # bitwise shift right
 );
 
 # Returns number of changes, 0 if not changes, undef on error.
