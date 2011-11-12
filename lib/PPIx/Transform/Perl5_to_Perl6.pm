@@ -186,6 +186,8 @@ my %ops_translation = (
 
     '<<'  => [ '+<', '~<' ], # bitwise shift left
     '>>'  => [ '+>', '~>' ], # bitwise shift right
+    '<<=' => [ '+<=', '~<=' ], # bitwise shift assign left
+    '>>=' => [ '+>=', '~>=' ], # bitwise shift assign right
 );
 
 # Returns number of changes, 0 if not changes, undef on error.
