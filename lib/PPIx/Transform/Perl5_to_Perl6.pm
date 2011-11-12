@@ -190,16 +190,27 @@ my %ops_translation = (
     '>>=' => [ '+>=', '~>=' ], # bitwise shift assign right
 );
 
+sub _get_all {
+    croak 'Wrong number of arguments passed to sub' if @_ != 2;
+    my ( $PPI_doc, $classname ) = @_;
+    croak 'Parameter 1 must be a PPI::Document!' if !_INSTANCE($PPI_doc, 'PPI::Document');
+    croak 'Parameter 2 must be a classname!'     if !_STRING($classname);
+
+    $classname = "PPI::$classname" if $classname !~ m{^PPI::};
+
+    my $aref = $PPI_doc->find($classname)
+        or return;
+
+    return @{$aref};
+}
+
 # Returns number of changes, 0 if not changes, undef on error.
 sub _translate_all_ops {
     croak 'Wrong number of arguments passed to method' if @_ != 2;
     my ( $self, $PPI_doc ) = @_;
 
-    my $ops_aref = $PPI_doc->find( 'PPI::Token::Operator' )
-        or return 0;
-
     my $change_count = 0;
-    for my $op ( @{$ops_aref} ) {
+    for my $op ( _get_all( $PPI_doc, 'Token::Operator' ) ) {
         my $p5_op = $op->content;
 
         my $p6_op = $ops_translation{$p5_op}
