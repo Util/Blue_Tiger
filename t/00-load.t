@@ -9,7 +9,7 @@ BEGIN {
         or print "Bail out!\n";
 }
 
-diag(
+note(
     'Testing PPIx::Transform::Perl5_to_Perl6'
         . " $PPIx::Transform::Perl5_to_Perl6::VERSION, Perl $], $^X"
 );
