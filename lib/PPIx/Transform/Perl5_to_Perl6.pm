@@ -128,6 +128,10 @@ my %ops_translation = (
     '=~'  =>   '~~',
     '!~'  =>   '!~~',
 
+    # Ternary op
+    '?'   => '??',
+    ':'   => '!!',
+
     # Bitwise ops
     # http://perlcabal.org/syn/S03.html#Changes_to_Perl_5_operators
     #   Bitwise operators get a data type prefix: +, ~, or ?.

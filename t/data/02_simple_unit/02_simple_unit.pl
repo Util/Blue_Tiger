@@ -98,3 +98,9 @@ $x !~ /re/;
 # Out:
 $x !~~ /re/;
 #---
+# Name: Ternary operator
+# In:
+$foo = ($x) ? $y : $z;
+# Out:
+$foo = ($x) ?? $y !! $z;
+#---
