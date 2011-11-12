@@ -111,10 +111,44 @@ sub _convert_Perl5_PPI_to_Perl6_PPI {
     my ( $self, $PPI_doc ) = @_;
     croak 'Parameter 2 must be a PPI::Document!' if !_INSTANCE($PPI_doc, 'PPI::Document');
 
+    $self->_fix_PPI_shift_equals_op_bug($PPI_doc);
+
     my $change_count = 0;
     $change_count += $self->_translate_all_ops($PPI_doc);
 
     return $change_count;
+}
+
+
+# PPI Bug: += is a single operator, but <<= is two operators, << and = .
+# <<= should be one operator. Same for >>= .
+sub _fix_PPI_shift_equals_op_bug {
+    croak 'Wrong number of arguments passed to method' if @_ != 2;
+    my ( $self, $PPI_doc ) = @_;
+
+    my $ops_aref = $PPI_doc->find( 'PPI::Token::Operator' )
+        or return;
+
+    my @ops_to_delete;
+    for my $op ( @{$ops_aref} ) {
+        my $content = $op->content;
+
+        next unless $content eq '<<'
+                 or $content eq '>>';
+
+        my $sib = $op->next_sibling
+            or next;
+
+        next unless $sib->class   eq 'PPI::Token::Operator'
+                and $sib->content eq '=';
+
+        $op->add_content('=');
+        push @ops_to_delete, $sib;
+    }
+
+    $_->delete or warn for @ops_to_delete;
+
+    return 1;
 }
 
 
