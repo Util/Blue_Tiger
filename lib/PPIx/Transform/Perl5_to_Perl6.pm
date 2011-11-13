@@ -8,7 +8,10 @@ use base 'PPI::Transform';
 
 BEGIN {
     # Before 1.204_03, PPI::Transform silently threw away all params to new().
-    use PPI::Transform 1.204 ();
+    {
+        no warnings 'numeric';
+        use PPI::Transform 1.204 ();
+    }
     my $ver = $PPI::Transform::VERSION;
     if ( $ver eq '1.204_01' or $ver eq '1.204_02' ) {
         die "PPI::Transform version 1.204_03 required--this is only version $ver";
