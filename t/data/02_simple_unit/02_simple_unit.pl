@@ -120,3 +120,27 @@ $foo = ($x) ? $y : $z;
 # Out:
 $foo = ($x) ?? $y !! $z;
 #---
+# Name: Sigils - array sigil is now @ when keyed
+# In:
+$foo[$bar]
+# Out:
+@foo[$bar]
+#---
+# Name: Sigils - array sigil is still @ when sliced
+# In:
+@foo[$bar,$baz]
+# Out:
+@foo[$bar,$baz]
+#---
+# Name: Sigils - hash sigil is now % when keyed
+# In:
+$foo{$bar}
+# Out:
+%foo{$bar}
+#---
+# Name: Sigils - hash sigil is now % when sliced
+# In:
+@foo{$bar,$baz}
+# Out:
+%foo{$bar,$baz}
+#---

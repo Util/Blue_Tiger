@@ -115,6 +115,7 @@ sub _convert_Perl5_PPI_to_Perl6_PPI {
 
     my $change_count = 0;
     $change_count += $self->_translate_all_ops($PPI_doc);
+    $change_count += $self->_change_sigils($PPI_doc);
 
     return $change_count;
 }
@@ -242,6 +243,29 @@ sub _translate_all_ops {
     }
 
     return $change_count;
+}
+
+sub _change_sigils {
+    croak 'Wrong number of arguments passed to method' if @_ != 2;
+    my ( $self, $PPI_doc ) = @_;
+    croak 'Parameter 2 must be a PPI::Document!' if !_INSTANCE($PPI_doc, 'PPI::Document');
+
+    # Easy, since methods raw_type and symbol_type already contain the
+    # logic to look at subscripts to figure out the real type of the variable.
+    # Handles $foo[5]       -> @foo[5]       (array element), 
+    #         $foo{$key}    -> %foo{$key}    (hash  element),
+    #     and @foo{'x','y'} -> %foo{'x','y'} (hash  slice  ).
+    #
+    # No change needed for     @foo[1,5]     (array slice  ).
+    my %sigil_needs_change = map { $_ => 1 } ( '$ @', '$ %', '@ %' );
+    my $count = 0;
+    for my $sym ( _get_all( $PPI_doc, 'Token::Symbol' ) ) {
+        my $types = $sym->raw_type . ' ' . $sym->symbol_type;
+        if ( $sigil_needs_change{$types} ) {
+            $sym->set_content( $sym->symbol_type . substr($sym->content, 1) );
+            $count++;
+        }
+    }
 }
 
 sub log_warn {
