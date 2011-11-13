@@ -257,12 +257,11 @@ sub _change_sigils {
     #     and @foo{'x','y'} -> %foo{'x','y'} (hash  slice  ).
     #
     # No change needed for     @foo[1,5]     (array slice  ).
-    my %sigil_needs_change = map { $_ => 1 } ( '$ @', '$ %', '@ %' );
+
     my $count = 0;
     for my $sym ( _get_all( $PPI_doc, 'Token::Symbol' ) ) {
-        my $types = $sym->raw_type . ' ' . $sym->symbol_type;
-        if ( $sigil_needs_change{$types} ) {
-            $sym->set_content( $sym->symbol_type . substr($sym->content, 1) );
+        if ( $sym->raw_type ne $sym->symbol_type ) {
+            $sym->set_content( $sym->symbol() );
             $count++;
         }
     }
