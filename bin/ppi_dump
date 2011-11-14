@@ -28,6 +28,7 @@ Usage: ppi_dump [ -hw ] [ -noc ] [ -e 'command' ] [ programfile ]
 END_OF_USAGE
 
 GetOptions(
+    'e=s@'          => \( my $literal_code   ),
     'c|content!'    => \( my $content    = 1 ),
     'w|whitespace'  => \( my $whitespace = 0 ),
     'h|help'        => \( my $help           ),
@@ -35,11 +36,11 @@ GetOptions(
 
 print $USAGE and exit(0) if $help;
 
+push @ARGV, @{$literal_code} if $literal_code;
 die $USAGE if @ARGV != 1;
 my ( $program_arg ) = @ARGV;
 
 # The program can either take a filename, or quoted perl code.
-# XXX Change to a -e option for quoted perl code, like for one-liners?
 my $PPI_doc;
 if ( $program_arg =~ m{\A\S+\z}msx and -s $program_arg ) {
     my $perl_filename = $program_arg;
