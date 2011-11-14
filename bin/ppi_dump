@@ -42,13 +42,13 @@ my ( $program_arg ) = @ARGV;
 
 # The program can either take a filename, or quoted perl code.
 my $PPI_doc;
-if (!$literal_code) {
-    my $perl_filename = $program_arg;
-    $PPI_doc = PPI::Document->new( $perl_filename );
-}
-else {
+if ($literal_code) {
     my $perl_source_code = $program_arg;
     $PPI_doc = PPI::Document->new( \$perl_source_code );
+}
+else {
+    my $perl_filename = $program_arg;
+    $PPI_doc = PPI::Document->new( $perl_filename );
 }
 die "Could not generate PPI from input '$program_arg'" if !defined $PPI_doc;
 
