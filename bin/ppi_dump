@@ -9,8 +9,16 @@ use Getopt::Long;
 # It parses a piece of Perl code with PPI, then dumps the structure to STDOUT.
 
 my $USAGE = <<'END_OF_USAGE';
-Usage:  ppi_dump [--nocontent] [--whitespace] file.pl
-        ppi_dump [--nocontent] [--whitespace] 'quoted-perl-code'
+Usage: ppi_dump [ -hw ] [ -noc ] [ programfile ]
+
+    -w, --whitespace
+        show whitespace tokens, which are normally suppressed.
+
+    -noc, --nocontent
+        suppress showing the content of each element.
+
+    -h, --help
+        prints this usage message and exits normally.
 END_OF_USAGE
 
 GetOptions(
