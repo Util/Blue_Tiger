@@ -55,7 +55,7 @@ for my $test_block (@tests) {
     my @fields = ( $test_block =~ /$test_re/ )
       or die "Ack! '$test_block'";
 
-    # Force existance of any optional captures.
+    # Force existence of any optional captures.
     $#fields = 3 if $#fields < 3;
 
     my %t;
