@@ -144,3 +144,63 @@ $foo{$bar}
 # Out:
 %foo{$bar,$baz}
 #---
+# Name: Cast: $$foo remains unchanged
+# In:
+$$foo
+# Out:
+$$foo
+#---
+# Name: Cast: @$foo remains unchanged
+# In:
+@$foo
+# Out:
+@$foo
+#---
+# Name: Cast: %$foo remains unchanged
+# In:
+%$foo
+# Out:
+%$foo
+#---
+# Name: Cast: &$foo remains unchanged
+# In:
+&$foo
+# Out:
+&$foo
+#---
+# Name: Cast: *$foo remains unchanged
+# In:
+*$foo
+# Out:
+*$foo
+#---
+# Name: Cast: ${$foo} -> $($foo)
+# In:
+${$foo}
+# Out:
+$($foo)
+#---
+# Name: Cast: @{$foo} -> @($foo)
+# In:
+@{$foo}
+# Out:
+@($foo)
+#---
+# Name: Cast: %{$foo} -> %($foo)
+# In:
+%{$foo}
+# Out:
+%($foo)
+#---
+# Name: Cast: &{$foo} -> &($foo)
+# In:
+&{$foo}
+# Out:
+&($foo)
+#---
+# Name: Cast: *{$foo} -> *($foo)
+# In:
+*{$foo}
+# Out:
+*($foo)
+#---

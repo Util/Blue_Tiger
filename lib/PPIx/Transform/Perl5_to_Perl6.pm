@@ -119,6 +119,7 @@ sub _convert_Perl5_PPI_to_Perl6_PPI {
     my $change_count = 0;
     $change_count += $self->_translate_all_ops($PPI_doc);
     $change_count += $self->_change_sigils($PPI_doc);
+    $change_count += $self->_change_casts($PPI_doc);
 
     return $change_count;
 }
@@ -269,6 +270,40 @@ sub _change_sigils {
         }
     }
 }
+
+sub _change_casts {
+    croak 'Wrong number of arguments passed to method' if @_ != 2;
+    my ( $self, $PPI_doc ) = @_;
+    croak 'Parameter 2 must be a PPI::Document!' if !_INSTANCE($PPI_doc, 'PPI::Document');
+
+    # PPI mis-parses `% $foo`, so we cannot easily convert to the
+    # better-written '%($foo)'. See:
+    #       bin/ppi_dump -e '%{$foo};' -e '%$foo;' -e '% $foo;' -e '% {$foo};'
+    my $count = 0;
+    for my $cast ( _get_all( $PPI_doc, 'Token::Cast' ) ) {
+        my $s = $cast->next_sibling;
+        if ( $s->isa('PPI::Token::Symbol') ) {
+            # Don't do anything. %$foo is still a valid form in Perl 6.
+        }
+        elsif ( $s->isa('PPI::Structure::Block') ) {
+            # %{...} becomes %(...). Same with @{...} and ${...}.
+            if ( $s->start->content eq '{' and $s->finish->content eq '}' ) {
+                 $s->start->set_content('(');
+                $s->finish->set_content(')');
+                $count++;
+            }
+        }
+        else {
+            $self->log_warn(
+                $cast,
+                'XXX May have mis-parsed a Cast - sibling class ', $s->class
+            );
+        }
+    }
+
+    return $count;
+}
+
 
 sub log_warn {
     my ( $self, $loc, @message_parts ) = @_;
