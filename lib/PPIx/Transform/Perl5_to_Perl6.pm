@@ -258,7 +258,7 @@ sub _change_sigils {
 
     # Easy, since methods raw_type and symbol_type already contain the
     # logic to look at subscripts to figure out the real type of the variable.
-    # Handles $foo[5]       -> @foo[5]       (array element), 
+    # Handles $foo[5]       -> @foo[5]       (array element),
     #         $foo{$key}    -> %foo{$key}    (hash  element),
     #     and @foo{'x','y'} -> %foo{'x','y'} (hash  slice  ).
     #
