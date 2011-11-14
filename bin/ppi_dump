@@ -2,7 +2,7 @@
 use strict;
 use warnings;
 use PPI;
-use PPI::Dumper; # XXX Bug in documentation of PPI::Dumper - must 'use' it separately - bug in doc, or bug that it is supposed to auto-work?
+use PPI::Dumper;
 use Getopt::Long;
 
 # This program is a development aid for Blue Tiger.
