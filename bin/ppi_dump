@@ -36,17 +36,20 @@ GetOptions(
 
 print $USAGE and exit(0) if $help;
 
-die $USAGE if @ARGV != 1 and !$literal_code;
 my ( $program_arg ) = @ARGV;
 
 # The program can either take a filename, or quoted perl code.
 my $PPI_doc;
 if ($literal_code) {
+    die $USAGE if @ARGV != 0;
+
     my $code = join "\n", @{$literal_code};
     $PPI_doc = PPI::Document->new( \$code )
         or die "Could not generate PPI from literal input '$code'";
 }
 else {
+    die $USAGE if @ARGV != 1;
+
     my $program_path = $program_arg;
     $PPI_doc = PPI::Document->new( $program_path )
         or die "Could not generate PPI from file '$program_path'";
