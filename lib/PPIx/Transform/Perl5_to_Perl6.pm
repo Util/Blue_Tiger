@@ -156,6 +156,20 @@ sub _fix_PPI_shift_equals_op_bug {
 }
 
 
+sub _get_all {
+    croak 'Wrong number of arguments passed to sub' if @_ != 2;
+    my ( $PPI_doc, $classname ) = @_;
+    croak 'Parameter 1 must be a PPI::Document!' if !_INSTANCE($PPI_doc, 'PPI::Document');
+    croak 'Parameter 2 must be a classname!'     if !_STRING($classname);
+
+    $classname = "PPI::$classname" if $classname !~ m{^PPI::};
+
+    my $aref = $PPI_doc->find($classname)
+        or return;
+
+    return @{$aref};
+}
+
 # Each entry is either a straight translation,
 # or a list of possible translations.
 my %ops_translation = (
@@ -193,20 +207,6 @@ my %ops_translation = (
     '<<=' => [ '+<=', '~<=' ], # bitwise shift assign left
     '>>=' => [ '+>=', '~>=' ], # bitwise shift assign right
 );
-
-sub _get_all {
-    croak 'Wrong number of arguments passed to sub' if @_ != 2;
-    my ( $PPI_doc, $classname ) = @_;
-    croak 'Parameter 1 must be a PPI::Document!' if !_INSTANCE($PPI_doc, 'PPI::Document');
-    croak 'Parameter 2 must be a classname!'     if !_STRING($classname);
-
-    $classname = "PPI::$classname" if $classname !~ m{^PPI::};
-
-    my $aref = $PPI_doc->find($classname)
-        or return;
-
-    return @{$aref};
-}
 
 # Returns number of changes, 0 if not changes, undef on error.
 sub _translate_all_ops {
