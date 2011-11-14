@@ -204,3 +204,31 @@ $($foo)
 # Out:
 *($foo)
 #---
+# Name: Decimal points: 42 -> 42 : No change for integer
+# In:
+42
+# Out:
+42
+#---
+# Name: Decimal points: 42.1 -> 42.1 : No change for proper FP
+# In:
+42.1
+# Out:
+42.1
+#---
+# Name: Decimal points: 42. -> 42.0 : fix trailing
+# In:
+42.
+# Out:
+42.0
+# Warn:
+At line 1, position 1, floating point number '42.' was changed to floating point number '42.0'. Consider changing it to integer '42'.
+#---
+# Name: Decimal points: 42_555. -> 42_555.0 : fix trailing, even with underscores.
+# In:
+42_555.
+# Out:
+42_555.0
+# Warn:
+At line 1, position 1, floating point number '42_555.' was changed to floating point number '42_555.0'. Consider changing it to integer '42_555'.
+#---

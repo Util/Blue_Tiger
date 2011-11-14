@@ -120,6 +120,7 @@ sub _convert_Perl5_PPI_to_Perl6_PPI {
     $change_count += $self->_translate_all_ops($PPI_doc);
     $change_count += $self->_change_sigils($PPI_doc);
     $change_count += $self->_change_casts($PPI_doc);
+    $change_count += $self->_change_trailing_fp($PPI_doc);
 
     return $change_count;
 }
@@ -304,6 +305,30 @@ sub _change_casts {
     return $count;
 }
 
+sub _change_trailing_fp {
+    croak 'Wrong number of arguments passed to method' if @_ != 2;
+    my ( $self, $PPI_doc ) = @_;
+    croak 'Parameter 2 must be a PPI::Document!' if !_INSTANCE($PPI_doc, 'PPI::Document');
+
+    # [S02] Implicit Topical Method Calls
+    # ...you may no longer write a Num as C<42.> with just a trailing dot.
+    my $count = 0;
+    for my $fp ( _get_all( $PPI_doc, 'Token::Number::Float' ) ) {
+        my $n = $fp->content;
+        if ( $n =~ m{ \A ([_0-9]+) [.] \z }msx ) { # Could have underscore
+            my $bare_num = $1;
+            my $n0 = $n . '0';
+            $fp->set_content( $n0 );
+            $self->log_warn(
+                $fp,
+                "floating point number '$n' was changed to floating point number '$n0'. Consider changing it to integer '$bare_num'.",
+            );
+            $count++;
+        }
+    }
+
+    return $count;
+}
 
 sub log_warn {
     my ( $self, $loc, @message_parts ) = @_;
