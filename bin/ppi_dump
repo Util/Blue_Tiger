@@ -42,12 +42,8 @@ my ( $program_arg ) = @ARGV;
 
 # The program can either take a filename, or quoted perl code.
 my $PPI_doc;
-if ( $program_arg =~ m{\A\S+\z}msx and -s $program_arg ) {
+if (!$literal_code) {
     my $perl_filename = $program_arg;
-    if ( not -e $perl_filename ) {
-        die 'Your argument contained no whitespace, and so was interpreted'
-          . " as a filename, but no file of the name '$perl_filename' exists!";
-    }
     $PPI_doc = PPI::Document->new( $perl_filename );
 }
 else {
