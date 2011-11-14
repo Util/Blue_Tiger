@@ -232,3 +232,87 @@ At line 1, position 1, floating point number '42.' was changed to floating point
 # Warn:
 At line 1, position 1, floating point number '42_555.' was changed to floating point number '42_555.0'. Consider changing it to integer '42_555'.
 #---
+# Name: Keyword requires space before condition: if(condition) -> if (condition)
+# In:
+if($foo) {print}
+unless($foo) {print}
+elsif($bar) {print}
+while($foo) {print}
+until($foo) {print}
+foreach(@foo) {print}
+for(@foo) {print}
+for(my $i = 0; $i < 5; $i++) {print}
+given($foo) {print}
+when($foo) {print}
+# Out:
+if ($foo) {print}
+unless ($foo) {print}
+elsif ($bar) {print}
+while ($foo) {print}
+until ($foo) {print}
+foreach (@foo) {print}
+for (@foo) {print}
+for (my $i = 0; $i < 5; $i++) {print}
+given ($foo) {print}
+when ($foo) {print}
+#---
+# Name: Keyword requires space before condition: No change when space exists
+# In:
+if ($foo) {print}
+unless ($foo) {print}
+elsif ($bar) {print}
+while ($foo) {print}
+until ($foo) {print}
+foreach (@foo) {print}
+for (@foo) {print}
+for (my $i = 0; $i < 5; $i++) {print}
+given ($foo) {print}
+when ($foo) {print}
+# Out:
+if ($foo) {print}
+unless ($foo) {print}
+elsif ($bar) {print}
+while ($foo) {print}
+until ($foo) {print}
+foreach (@foo) {print}
+for (@foo) {print}
+for (my $i = 0; $i < 5; $i++) {print}
+given ($foo) {print}
+when ($foo) {print}
+#---
+# Name: Keyword requires space before condition: print if($foo) -> print if ($foo)
+# In:
+print if($foo)
+print unless($foo)
+print while($foo)
+print until($foo)
+print foreach(@foo)
+print for(@foo)
+print when($foo)
+# Out:
+print if ($foo)
+print unless ($foo)
+print while ($foo)
+print until ($foo)
+print foreach (@foo)
+print for (@foo)
+print when ($foo)
+#---
+# Name: Keyword requires space before condition: No change when space exists (postfix)
+# In:
+print if ($foo)
+print unless ($foo)
+print while ($foo)
+print until ($foo)
+print foreach (@foo)
+print for (@foo)
+print when ($foo)
+# Out:
+print if ($foo)
+print unless ($foo)
+print while ($foo)
+print until ($foo)
+print foreach (@foo)
+print for (@foo)
+print when ($foo)
+#---

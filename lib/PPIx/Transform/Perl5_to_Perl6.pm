@@ -121,6 +121,7 @@ sub _convert_Perl5_PPI_to_Perl6_PPI {
     $change_count += $self->_change_sigils($PPI_doc);
     $change_count += $self->_change_casts($PPI_doc);
     $change_count += $self->_change_trailing_fp($PPI_doc);
+    $change_count += $self->_insert_space_after_keyword($PPI_doc);
 
     return $change_count;
 }
@@ -323,6 +324,63 @@ sub _change_trailing_fp {
                 $fp,
                 "floating point number '$n' was changed to floating point number '$n0'. Consider changing it to integer '$bare_num'.",
             );
+            $count++;
+        }
+    }
+
+    return $count;
+}
+
+sub _insert_space_after_keyword {
+    croak 'Wrong number of arguments passed to method' if @_ != 2;
+    my ( $self, $PPI_doc ) = @_;
+    croak 'Parameter 2 must be a PPI::Document!' if !_INSTANCE($PPI_doc, 'PPI::Document');
+
+    # [S03] Minimal whitespace DWIMmery
+    # Whitespace is in general required between any keyword and any opening
+    # bracket that is I<not> introducing a subscript or function arguments.
+    # Any keyword followed directly by parentheses will be taken as a
+    # function call instead.
+    #     if $a == 1 { say "yes" }            # preferred syntax
+    #     if ($a == 1) { say "yes" }          # P5-ish if construct
+    #     if($a,$b,$c)                        # if function call
+    #
+    # [S04] Statement parsing
+    # Built-in statement-level keywords require whitespace between the
+    # keyword and the first argument, as well as before any terminating loop.
+    # In particular, a syntax error will be reported for C-isms such as these:
+    #     if(...) {...}
+    #     while(...) {...}
+    #     for(...) {...}
+
+    my %wanted = (
+        if       => { 'PPI::Structure::Condition' => 1, },
+        unless   => { 'PPI::Structure::Condition' => 1, },
+        elsif    => { 'PPI::Structure::Condition' => 1, },
+        while    => { 'PPI::Structure::Condition' => 1, },
+        until    => { 'PPI::Structure::Condition' => 1, },
+        given    => { 'PPI::Structure::Given'     => 1, },
+        when     => { 'PPI::Structure::When'      => 1,
+                      'PPI::Structure::List'      => 1, },
+        for      => { 'PPI::Structure::List'      => 1,
+                      'PPI::Structure::For'       => 1, },
+        foreach  => { 'PPI::Structure::List'      => 1,
+                      'PPI::Structure::For'       => 1, },
+    );
+    my $count = 0;
+    for my $keyword ( _get_all( $PPI_doc, 'Token::Word' ) ) {
+        my $expected_sib_types_href = $wanted{$keyword}
+            or next;
+
+        my $sib = $keyword->next_sibling
+            or next;
+
+        my $c = $sib->class
+            or next;
+
+        if ( $expected_sib_types_href->{$c} ) {
+            my $space = PPI::Token::Whitespace->new(' ');
+            $keyword->insert_after($space);
             $count++;
         }
     }
