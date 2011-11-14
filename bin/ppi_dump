@@ -16,7 +16,10 @@ END_OF_USAGE
 GetOptions(
     'c|content!'    => \( my $content    = 1 ),
     'w|whitespace'  => \( my $whitespace = 0 ),
+    'h|help'        => \( my $help           ),
 ) or die $USAGE;
+
+print $USAGE and exit(0) if $help;
 
 die $USAGE if @ARGV != 1;
 my ( $program_arg ) = @ARGV;
