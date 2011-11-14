@@ -9,7 +9,13 @@ use Getopt::Long;
 # It parses a piece of Perl code with PPI, then dumps the structure to STDOUT.
 
 my $USAGE = <<'END_OF_USAGE';
-Usage: ppi_dump [ -hw ] [ -noc ] [ programfile ]
+Usage: ppi_dump [ -hw ] [ -noc ] [ -e 'command' ] [ programfile ]
+
+    -e 'command'
+        may be used to enter one line of program.  If −e is given, ppi_dump
+        will not look for a filename in the argument list.  Multiple −e
+        commands may be given to build up a multi‐line script.  Make sure
+        to use semicolons where you would in a normal program.
 
     -w, --whitespace
         show whitespace tokens, which are normally suppressed.
