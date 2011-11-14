@@ -14,8 +14,8 @@ Usage:  ppi_dump [--nocontent] [--whitespace] file.pl
 END_OF_USAGE
 
 GetOptions(
-    'content|c'     => \( my $content    = 1 ),
-    'whitespace|w'  => \( my $whitespace = 0 ),
+    'c|content'     => \( my $content    = 1 ),
+    'w|whitespace'  => \( my $whitespace = 0 ),
 ) or die $USAGE;
 
 die $USAGE if @ARGV != 1;
