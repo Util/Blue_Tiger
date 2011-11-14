@@ -44,13 +44,14 @@ my ( $program_arg ) = @ARGV;
 my $PPI_doc;
 if ($literal_code) {
     my $code = $program_arg;
-    $PPI_doc = PPI::Document->new( \$code );
+    $PPI_doc = PPI::Document->new( \$code )
+        or die "Could not generate PPI from literal input '$code'";
 }
 else {
     my $program_path = $program_arg;
-    $PPI_doc = PPI::Document->new( $program_path );
+    $PPI_doc = PPI::Document->new( $program_path )
+        or die "Could not generate PPI from file '$program_path'";
 }
-die "Could not generate PPI from input '$program_arg'" if !defined $PPI_doc;
 
 
 my $Dumper = PPI::Dumper->new(
