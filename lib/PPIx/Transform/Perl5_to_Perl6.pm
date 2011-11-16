@@ -122,6 +122,7 @@ sub _convert_Perl5_PPI_to_Perl6_PPI {
     $change_count += $self->_change_casts($PPI_doc);
     $change_count += $self->_change_trailing_fp($PPI_doc);
     $change_count += $self->_insert_space_after_keyword($PPI_doc);
+    $change_count += $self->_clothe_the_bareword_hash_keys($PPI_doc);
 
     return $change_count;
 }
@@ -383,6 +384,56 @@ sub _insert_space_after_keyword {
             $keyword->insert_after($space);
             $count++;
         }
+    }
+
+    return $count;
+}
+
+sub _only_schild {
+    croak 'Wrong number of arguments passed to sub' if @_ != 2;
+    my ( $element, $class ) = @_;
+
+    my @ss_kids = $element->schildren;
+    return unless @ss_kids == 1;
+    my $child = $ss_kids[0];
+    return unless $child->isa($class);
+    return $child;
+}
+
+sub _clothe_the_bareword_hash_keys {
+    croak 'Wrong number of arguments passed to method' if @_ != 2;
+    my ( $self, $PPI_doc ) = @_;
+    croak 'Parameter 2 must be a PPI::Document!' if !_INSTANCE($PPI_doc, 'PPI::Document');
+
+    # Translate all the bareword hash keys into single-quote.
+    my $count = 0;
+    for my $subscript ( _get_all( $PPI_doc, 'Structure::Subscript' ) ) {
+
+        # Must have this structure:
+        #        PPI::Token::Symbol          '$z'
+        #        PPI::Structure::Subscript   { ... }
+        #          PPI::Statement::Expression
+        #            PPI::Token::Word        'foo'
+
+        next unless $subscript->sprevious_sibling->isa('PPI::Token::Symbol');
+
+        next unless substr( $subscript,  0, 1 ) eq '{'
+                and substr( $subscript, -1, 1 ) eq '}';
+
+        my $expression = _only_schild($subscript, 'PPI::Statement::Expression')
+            or next;
+
+        my $word = _only_schild($expression, 'PPI::Token::Word')
+            or next;
+
+        my $quoted_word  = "'" . $word->content . "'";
+        my $quoted_token = PPI::Token::Quote::Single->new($quoted_word);
+
+        # Cannot use replace() because $quoted_token and $word differ in type.
+        $word->insert_after($quoted_token) or warn;
+        $word->delete or warn;
+
+        $count++;
     }
 
     return $count;

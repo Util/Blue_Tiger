@@ -144,6 +144,20 @@ $foo{$bar}
 # Out:
 %foo{$bar,$baz}
 #---
+# Name: Hash - fix bareword keys
+# In:
+$z{foo}
+$z{'foo'}
+$z{"foo"}
+$z{$foo}
+$z{'foo'.$bar}
+# Out:
+%z{'foo'}
+%z{'foo'}
+%z{"foo"}
+%z{$foo}
+%z{'foo'~$bar}
+#---
 # Name: Cast: $$foo remains unchanged
 # In:
 $$foo
