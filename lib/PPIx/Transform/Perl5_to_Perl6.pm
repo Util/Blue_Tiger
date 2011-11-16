@@ -2,7 +2,6 @@ package PPIx::Transform::Perl5_to_Perl6;
 use strict;
 use warnings;
 use Carp         qw( carp croak );
-use Scalar::Util qw( blessed );
 use Params::Util qw( _INSTANCE _ARRAY _ARRAY0 _STRING );
 use base 'PPI::Transform';
 

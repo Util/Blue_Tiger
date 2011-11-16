@@ -11,5 +11,3 @@ Initial Author: Bruce Gray
 
 Pre-requisite modules:
     PPI 1.204_03 or higher
-    Scalar::Util
-
