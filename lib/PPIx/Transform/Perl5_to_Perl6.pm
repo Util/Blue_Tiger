@@ -431,7 +431,7 @@ Move the rest of the original code slush into place.
 Please submit a ticket to:
     https://github.com/Util/Blue_Tiger/issues
 
-Emails directly to the original author might be answered, but the discussion could not then be found and read by others.
+Emails sent directly to the original author might be answered, but the discussion could not then be found and read by others.
 
 =head1 AUTHOR
 
