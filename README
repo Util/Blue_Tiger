@@ -1,5 +1,10 @@
 Blue Tiger is an assistant for Perl 5 to Perl 6 translation.
 
+How to try it without installing:
+    git clone git://github.com/Util/Blue_Tiger.git
+    cd Blue_Tiger
+    bin/p526 path/to/program.pl > program_and_warnings.p6
+
 Initial Author: Bruce Gray
     Email:  bruce dot gray at acm dot org
     IRC:    "Util" on freenode/#perl6
