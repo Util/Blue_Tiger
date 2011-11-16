@@ -84,6 +84,7 @@ Planned/TODO:
     Hash init?          =>              ->  P5=>   (sometimes)
     rand function       rand            ->  P5rand
     qq changes          "${foo}bar"     ->  "{$foo}bar"
+                        "\l$foo"        ->  "{lc $foo}"
                         "\v"
     double-underscore   __PACKAGE__     ->  $?PACKAGE
     indent-i_fiers      "$foo_bar-30"   ->  "$foo_bar\-30"
@@ -93,6 +94,8 @@ Planned/TODO:
                         "$a.b()"        -> "$a.b\()"
                         "abc{def()}ghi" ->       "abc\{def()\}ghi"
                                      or -> qq:!c "abc{def()}ghi"
+    Unicode             "\N{NEGATED DOUBLE VERTICAL BAR DOUBLE RIGHT TURNSTILE}"
+                                        -> "\c[NEGATED DOUBLE VERTICAL BAR DOUBLE RIGHT TURNSTILE]"
     Unicode? Lots!
   Optional (and configurable!):
     Hashkey short form  %hash{'KEY'}    ->  %hash<KEY>
@@ -107,6 +110,7 @@ Planned/TODO:
     pick array          $a[rand @a]     ->  @a.pick
     Hash init           %h=map{$_=>1}@a ->  %h = @a X=> 1
     @_ handling         sub f{($n)=@_}  ->  sub f ($n) {}
+    Divides             ($n % 2) == 0   ->  $n %% 2
 
 =cut
 
@@ -526,6 +530,8 @@ sub log_warn {
 =head1 TODO
 
 Move the rest of the original code slush into place.
+
+For each Planned/TODO item in the DESCRIPTION above, add code to either implement the change or to warn about manual changes needed.
 
 =head1 SUPPORT
 
