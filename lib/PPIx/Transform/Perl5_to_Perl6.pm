@@ -341,6 +341,10 @@ sub _change_casts {
         if ( $s->isa('PPI::Token::Symbol') ) {
             # Don't do anything. %$foo is still a valid form in Perl 6.
         }
+        elsif ( $s->isa('PPI::Token::Cast') and $cast eq "\\" ) {
+            # Two casts in a row, like \% in \%{"$pack\:\:SUBS"} .
+            # Skip for now.
+        }
         elsif ( $s->isa('PPI::Structure::Block') ) {
             # %{...} becomes %(...). Same with @{...} and ${...}.
             if ( $s->start->content eq '{' and $s->finish->content eq '}' ) {
@@ -349,10 +353,16 @@ sub _change_casts {
                 $count++;
             }
         }
+        elsif ( $s->isa('PPI::Structure::List') and $cast eq "\\" ) {
+            # Don't do anything for now.
+            # \( $x, $y ) is not the construct we are looking for.
+        }
         else {
             $self->log_warn(
                 $cast,
-                'XXX May have mis-parsed a Cast - sibling class ', $s->class
+                'XXX May have mis-parsed a Cast - sibling class',
+                ' ', $s->class,
+                ' ', $s->content,
             );
         }
     }
