@@ -11,3 +11,58 @@ Initial Author: Bruce Gray
 
 Pre-requisite modules:
     PPI 1.204_03 or higher
+
+Currently handles (with examples):
+  Mandatory:
+    Operator changes    .               ->  ~
+    Invariant sigils    $hash{$key}     ->  %hash{$key}
+    Casts               @{$arrayref}    ->  @($arrayref)
+    Nums with trailing. 42.             ->  42.0
+    KeywordNoSpace      if(             ->  if (
+    Bare hash keys      $hash{KEY}      ->  %hash{'KEY'}
+  Optional:
+    Warnings for user review of transforms.
+
+Planned/TODO:
+  Mandatory:
+    for/loop            for(;$i>5;$i++) ->  loop (;$i>5;$i++)
+    foreach arrow       for my $i (@a)  ->  for @a -> $i
+    map/grep comma      @z=map {...} @a ->  @z=map {...}, @a
+    open                open my $fh,... ->  my $fh = open...
+    bareword filehandle open FH, ...    ->  my $FH = open...
+    readline via <>     <$fh>           ->  $fh.get (if scalar)
+    readline func       readline $fh    ->  $fh.get (if scalar)
+    while readline      while (<$fh>){} ->  for $fh.lines {}
+    magic diamond       while (<>){}    ->  for lines() {...}
+    ARGV/ARGS           @ARGV           ->  @*ARGS
+    Hash init?          =>              ->  P5=>   (sometimes)
+    rand function       rand            ->  P5rand
+    qq changes          "${foo}bar"     ->  "{$foo}bar"
+                        "\l$foo"        ->  "{lc $foo}"
+                        "\v"
+    double-underscore   __PACKAGE__     ->  $?PACKAGE
+    indent-i_fiers      "$foo_bar-30"   ->  "$foo_bar\-30"
+                                     or ->  "{$foo_bar}-30"
+    syntax collisions   '\qq[...]'      -> '\\qq[...]'
+      (especially qq)   "@array"        -> "@array[]"
+                        "$a.b()"        -> "$a.b\()"
+                        "abc{def()}ghi" ->       "abc\{def()\}ghi"
+                                     or -> qq:!c "abc{def()}ghi"
+    Unicode             "\N{NEGATED DOUBLE VERTICAL BAR DOUBLE RIGHT TURNSTILE}"
+                                        -> "\c[NEGATED DOUBLE VERTICAL BAR DOUBLE RIGHT TURNSTILE]"
+    Unicode? Lots!
+  Optional (and configurable!):
+    Hashkey short form  %hash{'KEY'}    ->  %hash<KEY>
+    Remove parens       if ($foo) {}    ->  if $foo {}
+    func vs method      @z=map {...} @a ->  @z=@a.map({...})
+    Infinite loop       while (1) {...} ->  loop {...}
+    qq un-hack          "@{[ $a * 2 ]}" ->  "{$a * 2}"
+    print/say           print "Hi!\n"   ->  say "Hi!";
+    Regex improvements  qr{ a [ ]+ b }x ->  re{ a b } XXXX smart spacing?
+    Bad slurp           for (<fh>){}    ->  for $fh.slurp
+    pick                int(rand 12)    ->  (^12).pick
+    pick array          $a[rand @a]     ->  @a.pick
+    Hash init           %h=map{$_=>1}@a ->  %h = @a X=> 1
+    @_ handling         sub f{($n)=@_}  ->  sub f ($n) {}
+    Divides             ($n % 2) == 0   ->  $n %% 2
+
