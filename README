@@ -10,6 +10,6 @@ Initial Author: Bruce Gray
     IRC:    "Util" on freenode/#perl6
 
 Pre-requisite modules:
-    PPI
+    PPI 1.204_03 or higher
     Scalar::Util
 
