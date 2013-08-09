@@ -107,7 +107,7 @@ sub translate_regexp {
 
     # {2,5} becomes ** 2..5
     # {2,}  becomes ** 2..*
-    # {,5}  becomes ** *..5
+    # {,5}  becomes ** 0..5
     if ( my $sq_aref = $re->find( 'Structure::Quantifier' ) ) {
         for my $sq ( @{$sq_aref} ) {
             warn if $sq->start ->content ne '{';
@@ -120,7 +120,8 @@ sub translate_regexp {
             if ($tl_aref) {
                 for my $i ( 0 .. $#{$tl_aref} ) {
                     next if $tl_aref->[$i]->content ne ',';
-                    $tl_aref->[$i]->{content} = ( $i == 0            ) ? '*..'
+                    warn "XXX Probable bug in your regexp! FOO{,n} is not defined in Perl 5; translating to 0..n anyway\n";
+                    $tl_aref->[$i]->{content} = ( $i == 0            ) ? '0..'
                                               : ( $i == $#{$tl_aref} ) ?  '..*'
                                               :                           '..'
                                               ;
