@@ -67,7 +67,14 @@ Wrote program.
 This program will translate Perl 5 code into Perl 6. Mostly :)
 
 Currently handles:
-    Operator changes.
+    Operator changes
+    Invariant sigils
+    Casts
+    Nums with trailing.
+    KeywordNoSpace
+    Bare hash keys
+    map/grep comma
+    Warnings for user review of transforms
 
 =end comments
 
@@ -99,7 +106,8 @@ sub document {
     #    Returns true if the transform was applied,
     #    false if there is an error in the transform process,
     #    or may die if there is a critical error in the apply handler.
-    # but if the transform *is* applied without error, and no change happens as a result, then apply() incorrectly returns undef.
+    # but if the transform *is* applied without error, and no change happens
+    # as a result, then apply() incorrectly returns undef.
     return 1 if defined $change_count and $change_count == 0;
 
     return $change_count;
