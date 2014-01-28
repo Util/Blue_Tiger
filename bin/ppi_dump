@@ -4,6 +4,7 @@ use warnings;
 use PPI;
 use PPI::Dumper;
 use Getopt::Long;
+Getopt::Long::Configure('bundling');
 
 # This program is a development aid for Blue Tiger.
 # It parses a piece of Perl code with PPI, then dumps the structure to STDOUT.
