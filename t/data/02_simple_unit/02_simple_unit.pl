@@ -330,3 +330,11 @@ print foreach (@foo)
 print for (@foo)
 print when ($foo)
 #---
+# Name: map and grep BLOCK now need a comma after the block
+# In:
+print map  { $_ * 2 } 0..3;
+print grep { $_ > 2 } 0..3;
+# Out:
+print map  { $_ * 2 }, 0..3;
+print grep { $_ > 2 }, 0..3;
+#---

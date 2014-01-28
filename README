@@ -20,6 +20,7 @@ Currently handles (with examples):
     Nums with trailing. 42.             ->  42.0
     KeywordNoSpace      if(             ->  if (
     Bare hash keys      $hash{KEY}      ->  %hash{'KEY'}
+    map/grep comma      @z=map {...} @a ->  @z=map {...}, @a
   Optional:
     Warnings for user review of transforms.
 
@@ -27,7 +28,6 @@ Planned/TODO:
   Mandatory:
     for/loop            for(;$i>5;$i++) ->  loop (;$i>5;$i++)
     foreach arrow       for my $i (@a)  ->  for @a -> $i
-    map/grep comma      @z=map {...} @a ->  @z=map {...}, @a
     open                open my $fh,... ->  my $fh = open...
     bareword filehandle open FH, ...    ->  my $FH = open...
     readline via <>     <$fh>           ->  $fh.get (if scalar)

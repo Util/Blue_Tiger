@@ -122,6 +122,7 @@ sub _convert_Perl5_PPI_to_Perl6_PPI {
     $change_count += $self->_change_trailing_fp($PPI_doc);
     $change_count += $self->_insert_space_after_keyword($PPI_doc);
     $change_count += $self->_clothe_the_bareword_hash_keys($PPI_doc);
+    $change_count += $self->_add_a_comma_after_mapish_blocks($PPI_doc);
 
     return $change_count;
 }
@@ -445,6 +446,33 @@ sub _clothe_the_bareword_hash_keys {
         $count++;
     }
 
+    return $count;
+}
+
+sub _add_a_comma_after_mapish_blocks {
+    croak 'Wrong number of arguments passed to method' if @_ != 2;
+    my ( $self, $PPI_doc ) = @_;
+    croak 'Parameter 2 must be a PPI::Document!' if !_INSTANCE($PPI_doc, 'PPI::Document');
+
+    my %wanted_words = map { $_ => 1 } qw( map grep );
+
+    # Add a comma after the block in `map BLOCK` or `grep BLOCK`.
+    my $count = 0;
+    for my $word ( _get_all( $PPI_doc, 'Token::Word' ) ) {
+        # Must have this structure:
+        # PPI::Token::Word          'map' (or 'grep')
+        # PPI::Structure::Block     { ... }
+
+        next unless $wanted_words{ $word->content };
+
+        my $sib = $word->snext_sibling;
+        next unless $sib->isa('PPI::Structure::Block');
+
+        my $comma = PPI::Token::Operator->new(',');
+        $sib->insert_after($comma) or warn;
+
+        $count++;
+    }
     return $count;
 }
 
