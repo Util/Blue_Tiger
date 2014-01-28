@@ -65,4 +65,5 @@ Planned/TODO:
     Hash init           %h=map{$_=>1}@a ->  %h = @a X=> 1
     @_ handling         sub f{($n)=@_}  ->  sub f ($n) {}
     Divides             ($n % 2) == 0   ->  $n %% 2
+    List::Util comma    first {...} @a  ->  first {...}, @a
 
