@@ -21,6 +21,7 @@ Currently handles (with examples):
     KeywordNoSpace      if(             ->  if (
     Bare hash keys      $hash{KEY}      ->  %hash{'KEY'}
     map/grep comma      @z=map {...} @a ->  @z=map {...}, @a
+    mapish EXPR         @z=map !$_,  @a ->  @z=map { !$_ }, @a
   Optional:
     Warnings for user review of transforms.
 

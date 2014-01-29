@@ -74,6 +74,7 @@ Currently handles:
     KeywordNoSpace
     Bare hash keys
     map/grep comma
+    mapish EXPR changes to {BLOCK}
     Warnings for user review of transforms
 
 =end comments
