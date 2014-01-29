@@ -256,6 +256,7 @@ until($foo) {print}
 foreach(@foo) {print}
 for(@foo) {print}
 for(my $i = 0; $i < 5; $i++) {print}
+foreach(my $i = 0; $i < 5; $i++) {print}
 given($foo) {print}
 when($foo) {print}
 # Out:
@@ -267,6 +268,7 @@ until ($foo) {print}
 foreach (@foo) {print}
 for (@foo) {print}
 for (my $i = 0; $i < 5; $i++) {print}
+foreach (my $i = 0; $i < 5; $i++) {print}
 given ($foo) {print}
 when ($foo) {print}
 #---
