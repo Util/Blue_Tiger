@@ -131,6 +131,7 @@ sub _convert_Perl5_PPI_to_Perl6_PPI {
     $change_count += $self->_insert_space_after_keyword($PPI_doc);
     $change_count += $self->_clothe_the_bareword_hash_keys($PPI_doc);
     $change_count += $self->_add_a_comma_after_mapish_blocks($PPI_doc);
+    $change_count += $self->_change_mapish_expr_to_block($PPI_doc);
 
     return $change_count;
 }
@@ -482,6 +483,76 @@ sub _add_a_comma_after_mapish_blocks {
         $count++;
     }
     return $count;
+}
+
+sub _change_mapish_expr_to_block {
+    croak 'Wrong number of arguments passed to method' if @_ != 2;
+    my ( $self, $PPI_doc ) = @_;
+    croak 'Parameter 2 must be a PPI::Document!' if !_INSTANCE($PPI_doc, 'PPI::Document');
+
+    my %wanted_words = map { $_ => 1 } qw( map grep );
+
+    # Change `map $_ * 5, @z` to `map { $_ * 5 }, @z`
+    my $count = 0;
+    for my $word ( _get_all( $PPI_doc, 'Token::Word' ) ) {
+        # Must have this structure:
+        #   PPI::Token::Word      'map'
+        #   ... NOT PPI::Structure::Block
+        #   PPI::Token::Operator      ','
+        # Changing to this new structure:
+        #   PPI::Token::Word  	'map'
+        #   PPI::Structure::Block  	{ ... }
+        #     PPI::Statement
+        #       ... from original version
+        #     PPI::Token::Operator      ','
+
+        next unless $wanted_words{ $word->content };
+
+        my $next_ssib = $word->snext_sibling;
+        next if $next_ssib->isa('PPI::Structure::Block');
+
+        # Can't use find() here because we need to search *forward* from $word,
+        # not *down* within $word.
+
+        my $last_sib = $next_ssib; # Can't be a comma, since `map ,` is invalid
+        my @elements_to_move = $last_sib;
+        while ( $last_sib = $last_sib->next_sibling ) {
+            last if $last_sib->isa('PPI::Token::Operator')
+                and $last_sib->content eq ',';
+            push @elements_to_move, $last_sib;
+        }
+        next unless $last_sib;
+
+        my $new_block = _make_a_block();
+        $next_ssib->insert_before($new_block) or die;
+
+        my $needs_leading_ws  = not $elements_to_move[ 0]->isa('PPI::Token::Whitespace');
+        my $needs_trailing_ws = not $elements_to_move[-1]->isa('PPI::Token::Whitespace');
+        my $s = PPI::Statement->new();
+        $s->add_element( PPI::Token::Whitespace->new(' ') ) if $needs_leading_ws;
+        $_->remove          or die for @elements_to_move;
+        $s->add_element($_) or die for @elements_to_move;
+        $s->add_element( PPI::Token::Whitespace->new(' ') ) if $needs_trailing_ws;
+
+        $new_block->add_element($s)
+            or die;
+
+        $count++;
+    }
+    return $count;
+}
+
+sub _make_a_block {
+    croak 'Wrong number of arguments passed to method' if @_;
+    
+    # XXX Flaw in PPI: Cannot simply create PPI::Structure::* with ->new().
+    # See https://rt.cpan.org/Public/Bug/Display.html?id=31564
+    my $new_block = PPI::Structure::Block->new(
+        PPI::Token::Structure->new('{'),
+    ) or die;
+    $new_block->{finish} = PPI::Token::Structure->new('}');
+
+    return $new_block;
 }
 
 sub log_warn {

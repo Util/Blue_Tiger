@@ -338,3 +338,11 @@ print grep { $_ > 2 } 0..3;
 print map  { $_ * 2 }, 0..3;
 print grep { $_ > 2 }, 0..3;
 #---
+# Name: map and grep EXPR now need that expression to be within a block.
+# In:
+print map  $_ * 2, 0..3;
+print grep $_ > 2, 0..3;
+# Out:
+print map  { $_ * 2 }, 0..3;
+print grep { $_ > 2 }, 0..3;
+#---
