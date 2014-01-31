@@ -348,3 +348,9 @@ print grep $_ > 2, 0..3;
 print map  { $_ * 2 }, 0..3;
 print grep { $_ > 2 }, 0..3;
 #---
+# Name: `foreach my $var (LIST)` becomes `for LIST <-> $var`
+# In:
+foreach my $i (@a) {}
+# Out:
+for @a <-> $i {}
+#---

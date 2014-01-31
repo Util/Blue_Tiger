@@ -133,6 +133,7 @@ sub _convert_Perl5_PPI_to_Perl6_PPI {
     $change_count += $self->_clothe_the_bareword_hash_keys($PPI_doc);
     $change_count += $self->_add_a_comma_after_mapish_blocks($PPI_doc);
     $change_count += $self->_change_mapish_expr_to_block($PPI_doc);
+    $change_count += $self->_change_foreach_my_lexvar_to_arrow($PPI_doc);
 
     return $change_count;
 }
@@ -543,9 +544,123 @@ sub _change_mapish_expr_to_block {
     return $count;
 }
 
+sub _change_foreach_my_lexvar_to_arrow {
+    croak 'Wrong number of arguments passed to method' if @_ != 2;
+    my ( $self, $PPI_doc ) = @_;
+    croak 'Parameter 2 must be a PPI::Document!' if !_INSTANCE($PPI_doc, 'PPI::Document');
+
+    my %wanted_words = map { $_ => 1 } qw( for foreach );
+
+    # XXX Need to log info on ro vs rw!
+    # XXX Need to force foreach to for!
+
+    # Also, named lex vars in `foreach` loops are read-write in Perl 5, but read-only by default in Perl 6.
+    #   Either make my generated code be rw, and log a message to go back and replace with ro as an optimization
+    #       or generate as ro, and log a message that it might not work!
+
+    # XXX Add code to trim the whitespace when parens are removed around something that already has whitespace.
+
+    # Change `for my $i (@a)` to `for @a -> $i`
+    my $count = 0;
+    for my $statement ( _get_all( $PPI_doc, 'Statement::Compound' ) ) {
+        # Must have this structure:
+        #   PPI::Statement::Compound
+        #     PPI::Token::Word  	'for' (or foreach)
+        #     PPI::Token::Word  	'my' # Optional - and XXX need to warn when encountered?
+        #     PPI::Token::Symbol  	'$i'
+        #     PPI::Structure::List  	( ... )
+        #       PPI::Statement
+        #         ...
+        # Changing to this new structure:
+        #   PPI::Statement::Compound
+        #     PPI::Token::Word  	'for' (or foreach)
+        #     PPI::Structure::List  	 ...
+        #       PPI::Statement
+        #         ...
+        #     PPI::Token::Operator  	'->'
+        #     PPI::Token::Symbol  	'$i'
+
+        my @sc = $statement->schildren;
+        next unless @sc and $sc[0] and $sc[0]->class() eq 'PPI::Token::Word'
+                and $wanted_words{ $sc[0]->content };
+        next unless @sc >= 4
+                and $sc[1]->class() eq 'PPI::Token::Word'     and $sc[1]->content eq 'my'
+                and $sc[2]->class() eq 'PPI::Token::Symbol'
+                and $sc[3]->class() eq 'PPI::Structure::List'
+                 or @sc >= 3
+                and $sc[1]->class() eq 'PPI::Token::Symbol'
+                and $sc[2]->class() eq 'PPI::Structure::List';
+
+        my @c = $statement->children;
+
+        _eat_optional_whilespace(\@c); # XXX Can this really occur here?
+
+        # Change keyword "foreach" to "for" if needed.
+        # Keyword is not needed in @c after this point.
+        {
+            my $k = shift @c or die;
+            die unless $k->class eq 'PPI::Token::Word' and $wanted_words{ $k->content };
+
+            # $k->replace( PPI::Token::Word->new('for') ) if $k->content eq 'foreach'; # XXX The ->replace method has not yet been implemented in PPI 1.215.
+            if ( $k->content eq 'foreach' ) {
+                my $new_k = PPI::Token::Word->new('for')    or die;
+                $k->insert_after($new_k)                    or die;
+                $k->delete()                                or die;
+            }
+        }
+
+        _eat_optional_whilespace(\@c);
+
+        # Peek at next element.
+        # Remove `my` if it was there, and register whether it was there, for later use.
+        my $had_my;
+        {
+            die if not @c;
+            $had_my =       $c[0]->class() eq 'PPI::Token::Word'
+                        and $c[0]->content eq 'my';
+            if ($had_my) {
+                my $k = shift @c;
+                $k->delete or die;
+            }
+        }
+
+        _eat_optional_whilespace(\@c);
+
+        my $var;
+        {
+            $var = shift @c or die;
+            die unless $var->class eq 'PPI::Token::Symbol';
+            $var->remove or die;
+        }
+        # die unless @c and $c[0]->class eq 'PPI::Token::Symbol';
+        # my $var = shift(@c)->remove or die;
+
+        _eat_optional_whilespace(\@c);
+
+        # Remove parens from (LIST)
+        die unless @c and $c[0]->class eq 'PPI::Structure::List';
+        my $sl = $c[0];
+        die unless $sl->start ->content eq '('
+               and $sl->finish->content eq ')';
+        $sl->start ->set_content('');
+        $sl->finish->set_content('');
+
+        $sl->insert_before( PPI::Token::Whitespace->new(' ') );
+        $sl->insert_after($_) for reverse (
+            PPI::Token::Whitespace->new(' '),
+            PPI::Token::Operator  ->new('<->'), # XXX Fixup with log message. In fact, make it an option.
+            PPI::Token::Whitespace->new(' '),
+            $var,
+        );
+
+        $count++;
+    }
+    return $count;
+}
+
 sub _make_a_block {
     croak 'Wrong number of arguments passed to method' if @_;
-    
+
     # XXX Flaw in PPI: Cannot simply create PPI::Structure::* with ->new().
     # See https://rt.cpan.org/Public/Bug/Display.html?id=31564
     my $new_block = PPI::Structure::Block->new(
@@ -554,6 +669,15 @@ sub _make_a_block {
     $new_block->{finish} = PPI::Token::Structure->new('}');
 
     return $new_block;
+}
+
+sub _eat_optional_whilespace {
+    my ($elements_aref) = @_;
+    return unless @{$elements_aref}
+              and   $elements_aref->[0]->class eq 'PPI::Token::Whitespace';
+    $elements_aref->[0]->delete or die;
+    shift @{$elements_aref};
+    return;
 }
 
 sub log_warn {
