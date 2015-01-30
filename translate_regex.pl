@@ -43,6 +43,7 @@ TODO:
     Add tests.
     Integrate with the existing Blue Tiger code.
     Handle `use re` /flags mode? Probably not.
+    Named capture: Translate qr{(?<FOO>bar)} into rx{ $<FOO>=[bar] } . See S05 "Named scalar aliasing to subpatterns"
 
 =end comments
 
