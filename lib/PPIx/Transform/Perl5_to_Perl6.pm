@@ -616,11 +616,11 @@ sub _change_foreach_my_lexvar_to_arrow {
         my $had_my;
         {
             die if not @c;
-            $had_my =       $c[0]->class() eq 'PPI::Token::Word'
-                        and $c[0]->content eq 'my';
+            $had_my = (     $c[0]->class() eq 'PPI::Token::Word'
+                        and $c[0]->content eq 'my' );
             if ($had_my) {
-                my $k = shift @c;
-                $k->delete or die;
+                my $keyword_my = shift @c or die;
+                   $keyword_my->delete    or die;
             }
         }
 
