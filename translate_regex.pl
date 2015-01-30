@@ -52,6 +52,9 @@ TODO:
 #say translate_regexp(
 #    "qr{([DEQ].{0,1}[LIM].{2,3}[LIVMF][^P]{2,3}[LMVF].[LMIV].{0,3}[DE])|([DE].{0,1}[LIM].{2,3}[LIVMF][^P]{2,3}[LMVF].[LMIV].{0,3}[DEQ])}"
 # "qr{foo}smx"
+#   'qr{["]}'
+#    "qr{[']}"
+#    "qr{[ ]}"
 #    "qr{abc{2,}}"
 #    "qr(abc{2,})"
 #    "qr{ab[-ce]{2,}}"
@@ -138,6 +141,19 @@ sub translate_regexp {
         for my $scc ( @{$scc_aref} ) {
             warn if $scc->start ->content ne '[';
             warn if $scc->finish->content ne ']';
+
+
+            # If this is a CharClass with only 1 char (like PBP recommends instead of escaping),
+            # replace with single-quoted string, or double-quoted if the char is a single-quote.
+            # XXX Are the extra spaces needed?
+            if ( $scc->children == 1 and ref $scc->child(0) eq 'PPIx::Regexp::Token::Literal' ) {
+                my $q = $scc->child(0)->content eq q{'} ? q{"} : q{'};
+                $scc->start ->{content} = ' ' . $q  ;
+                $scc->finish->{content} = $q  . ' ' ;
+                next;
+            }
+
+
             $scc->start ->{content} = '<[';
             $scc->finish->{content} = ']>';
 
