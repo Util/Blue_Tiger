@@ -61,4 +61,31 @@ my $Dumper = PPI::Dumper->new(
     whitespace => $whitespace,
 ) or die;
 
-$Dumper->print;
+my @lines = $Dumper->list;
+
+# This code aligns all the content on the right-hand side.
+my $re = qr{
+  ^
+    (   \s* \S+ )
+    (?: [ ]* \t )?
+    (   \S .*   )?
+  $
+}msx;
+my @structs;
+my $max_len = 0;
+for my $line (@lines) {
+    my ( $ws_and_class, $content ) = ( $line =~ /$re/ ) or warn;
+    my $len = length $ws_and_class;
+    $max_len = $len if $max_len < $len;
+    push @structs, [ $ws_and_class, $content ];
+}
+
+for my $struct_aref (@structs) {
+    my ( $ws_and_class, $content ) = @{$struct_aref};
+    if ( not defined $content ) {
+        print $ws_and_class, "\n";
+    }
+    else {
+        printf "%-${max_len}s   %s\n", $ws_and_class, $content;
+    }
+}
