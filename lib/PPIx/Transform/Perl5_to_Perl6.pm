@@ -567,7 +567,7 @@ sub _change_foreach_my_lexvar_to_arrow {
         #   PPI::Statement::Compound
         #     PPI::Token::Word  	'for' (or foreach)
         #     PPI::Token::Word  	'my' # Optional - and XXX need to warn when encountered?
-        #     PPI::Token::Symbol  	'$i'
+        #     PPI::Token::Symbol  	'$i' # Optional - use $_ when missing
         #     PPI::Structure::List  	( ... )
         #       PPI::Statement
         #         ...
@@ -589,7 +589,9 @@ sub _change_foreach_my_lexvar_to_arrow {
                 and $sc[3]->class() eq 'PPI::Structure::List'
                  or @sc >= 3
                 and $sc[1]->class() eq 'PPI::Token::Symbol'
-                and $sc[2]->class() eq 'PPI::Structure::List';
+                and $sc[2]->class() eq 'PPI::Structure::List'
+                 or @sc >= 2
+                and $sc[1]->class() eq 'PPI::Structure::List';
 
         my @c = $statement->children;
 
@@ -626,11 +628,18 @@ sub _change_foreach_my_lexvar_to_arrow {
 
         _eat_optional_whilespace(\@c);
 
+        # Peek at next element.
+        # Remove $VAR if it was there, and register $VAR, or $_ if absent.
         my $var;
         {
-            $var = shift @c or die;
-            die unless $var->class eq 'PPI::Token::Symbol';
-            $var->remove or die;
+            die if not @c;
+            if ( $c[0]->class() eq 'PPI::Token::Symbol' ) {
+                $var = shift @c or die;
+                $var->remove or die;
+            }
+            else {
+                $var = PPI::Token::Magic->new( '$_' );
+            }
         }
         # die unless @c and $c[0]->class eq 'PPI::Token::Symbol';
         # my $var = shift(@c)->remove or die;

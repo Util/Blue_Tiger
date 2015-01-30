@@ -265,8 +265,8 @@ unless ($foo) {print}
 elsif ($bar) {print}
 while ($foo) {print}
 until ($foo) {print}
-foreach (@foo) {print}
-for (@foo) {print}
+for @foo <-> $_ {print}
+for @foo <-> $_ {print}
 for (my $i = 0; $i < 5; $i++) {print}
 foreach (my $i = 0; $i < 5; $i++) {print}
 given ($foo) {print}
@@ -290,8 +290,8 @@ unless ($foo) {print}
 elsif ($bar) {print}
 while ($foo) {print}
 until ($foo) {print}
-foreach (@foo) {print}
-for (@foo) {print}
+for @foo <-> $_ {print}
+for @foo <-> $_ {print}
 for (my $i = 0; $i < 5; $i++) {print}
 given ($foo) {print}
 when ($foo) {print}
@@ -348,9 +348,17 @@ print grep $_ > 2, 0..3;
 print map  { $_ * 2 }, 0..3;
 print grep { $_ > 2 }, 0..3;
 #---
-# Name: `foreach my $var (LIST)` becomes `for LIST <-> $var`
+# Name: `foreach my $var (LIST)` becomes `for LIST <->`
 # In:
 foreach my $i (@a) {}
+for     my $i (@a) {}
 # Out:
 for @a <-> $i {}
+for @a <-> $i {}
+#---
+# Name: `foreach (LIST)` becomes `for LIST <-> $_`
+# In:
+foreach (@a) {}
+# Out:
+for @a <-> $_ {}
 #---
