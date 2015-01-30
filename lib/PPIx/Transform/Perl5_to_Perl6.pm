@@ -729,6 +729,10 @@ Move the rest of the original code slush into place.
 
 For each Planned/TODO item in the README file, add code to either implement the change or to warn about manual changes needed.
 
+Need to add an configuration option on how to translate `for` ( -> vs <-> ).
+Need to handle adding a informational note when translating for statements into <->, that it may be able to be shortened  to  -> .
+Need to handle adding a informational note when translating for statements into  ->, that it may be need to be lengthened to <-> .
+
 =head1 SUPPORT
 
 Please submit a ticket to:
