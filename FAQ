@@ -8,6 +8,12 @@ A:  No, this is a "tinkertoy" project of one of the Perl 6 developers.
 Q:  Well, then where *is* the "official" Perl5-to-Perl6 translator?
 A:  There isn't one (yet?). The one that Larry Wall is working on (called MAD)
     does not yet emit Perl 6 output. See Notes/mad.txt for more details.
+A:  Perlito is a compiler collection that implements a subset of Perl 5 and Perl 6.
+    If your code's syntax fits into the Perlito subset of Perl 5, then it can emit
+    a Perl 6 version of your code. YMMV as to whether Perlito or Blue Tiger better
+    serves your translation needs. Perlito's objectives are quite different
+    (and much broader) than Blue Tiger; neither is a subset of the other.
+    See http://www.perlito.org/ .
 A:  According to Larry at YAPC::NA::2010, the only thing that will be "official"
     in the Perl 6 ecosystem is the language specification and its test suite.
     Everything else is free to have multiple designs, implementations, etc.
