@@ -30,3 +30,17 @@ A:  Perl::Modernize is the intended namespace for the whole Blue Tiger project.
     http://www.youtube.com/watch?v=Bohxcat4g-A&t=22m10s (22m10s - 27m07s).
     Slides here:
     http://s3.datasaw.com/yapc/modernizing_perl_automatically.pdf
+
+Q:  Why is the project named "Blue Tiger"?
+A:  For a confluence of reasons:
+    * The spokesbug for Perl 6 is Camelia, a butterfly.
+    * This is a migration project.
+    * A migrating butterfly would be good as a project name.
+    * The best-known migrating butterfly is the Monarch.
+    * This was (at the time) not expected to be the primary migration tool.
+    * The Blue Tiger (Tirumala limniace) is a migratory butterfly that is
+      not Monarch.
+    * The initial bulk of the project was written in Auburn, home of the Auburn
+      _Tigers_ football team, whose colors are orange and
+      _blue_.
+    * Much of the code was written overlooking a butterfly garden.
