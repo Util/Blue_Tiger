@@ -19,3 +19,14 @@ A:  According to Larry at YAPC::NA::2010, the only thing that will be "official"
     Everything else is free to have multiple designs, implementations, etc.
     I had asked specifically because he had claimed the translator project for
     himself several years ago, and I did not want to step on any toes.
+
+Q:  What is Perl::Modernize?
+A:  Perl::Modernize is the intended namespace for the whole Blue Tiger project.
+    Even though all the early work has been focused on 5->6, I intend the
+    first released module in Perl::Modernize to be a 5->5 translator, that
+    automatically places my() in the correct positions in code that is not
+    `use strict` compliant.
+    See my 5-minute Lightning talk, "Modernizing Perl, Automatically", at
+    http://www.youtube.com/watch?v=Bohxcat4g-A&t=22m10s (22m10s - 27m07s).
+    Slides here:
+    http://s3.datasaw.com/yapc/modernizing_perl_automatically.pdf
