@@ -5,19 +5,63 @@ use 5.010;
 use PPI;
 use Data::Dumper; $Data::Dumper::Useqq = 1; $Data::Dumper::Sortkeys = 1;
 
-my $BLOCK_IS_AT_SUBLEVEL = 1; # Should the actual ::Block braces appear to be its children's level, instead of it's own level?
-
-my %lex;   # XXX Global - change to param? For every element in the tree, this holds its lexical scope level.
-my %lex2;  # XXX Global - change to param? Holds the starting point element of each      lexical scope level.
-my %lex2_flipped;
-my @DEBUG;
-
 my $program_path = './my_missing.pl';
+
+# List of things we are figuring out:
+#     Where are the lexical scopes? Where do they start, and end? Which statements are in which scopes?
+#     Where are the subs?           Where do they start, and end? Which statements are in which subs, or in MAINline?
+#     Where are vars used (via, R, W, etc)?
+#         If used in a sub, and the sub cannot isolate via my(), doesn't that infect all scopes?
+#     How are vars used in each statement? Read-only, read-write, write-read, write-only?
+#     Using the scope locations and RO/RW values, for each variable, determine where `my` can be added (it may be multiple locations).
+#     Determine all code mods needed, and extract changes to be independent of the memory refaddrs.
+#     Modify the code: Add the `my` keyword to the declaring statements, and/or insert a new `my` statement above the outermost common scope allowed by RO/RW/Sub.
+#         Do this in reverse order, walking up the tree or line/rowchar order.
+
+# XXX Need to better define my data structures!
+
+# XXX Need to add code to deal with (at least warn on) fully qualified variable names.
+# Would work better as False, to allow for 1TBS
+# my $BLOCK_IS_AT_SUBLEVEL = 1; # Should the actual ::Block braces appear to be its children's level, instead of it's own level?
+my $BLOCK_IS_AT_SUBLEVEL = 0; # Should the actual ::Block braces appear to be its children's level, instead of it's own level?
+
+# Change these to a single (or couple) of hashes (HoR)???
+# XXX Globals; XXX change to params?
+# XXX Merge these into ELEMENTS
+my %lex;            # For every element in the tree, this holds its lexical scope level.
+my %lex2;           # Holds the starting point element of each      lexical scope level.
+my %lex2_flipped;
+my %location;       # For every element in the tree, this holds its location by refaddr, to make it easier to find without walking later.
+my %is_whitespace;
+
+my @lines_AoA;      # For each line of source, refaddrs.
+
+# Consolidate!
+my %symbols;        # HoA of '@array' => [ refaddr1, refaddr2, ... ];
+my %symbol_first_seen; # HoA of '@array' => [ refaddr, $line, $rowcol ];
+
+# my %containing_statement; # refaddr => [ element, ref]
+
+my %addr_element;   # Every element from the PPI tree, indexed by refaddr for reverse lookup.
+
+my @DEBUG;
+my @ELEMENTS;       # Linearly assigned AoR; Fields are:
+    # INDEX         => $ELEMENTS.index_number, 
+    # ELEMENT       => $Element, # pointer to the real PPI::Element ,
+    # REFADDR       => $Element->refaddr,
+    # LOCATION      => $Element->location == [ $line, $rowchar, $col, $logical_line, $logical_file_name ]
+    # IS_WHITESPACE => Bool,
+    # IS_IN_SUB     => Bool,
+    # LEXICAL_SCOPE => String, # 5.8.7.3
+
+# Note that @ELEMENTS is indexed on REFADDR via the hash %XXX.
+
 die if not -e $program_path;
 
 my $PPI_doc = PPI::Document->new( $program_path )
     or die "Could not generate PPI from file '$program_path'";
-# $PPI_doc->index_locations;
+# XXX Add location indexing before anything else, to keep memory addresses from changing?
+$PPI_doc->index_locations;
 # my $foo = $PPI_doc->complete; # Fails on bare blocks! PPI 1.218
 # print Dumper $foo;
 # say '!!!';
@@ -27,29 +71,6 @@ my $PPI_doc = PPI::Document->new( $program_path )
 # So far, I see no way that  a lexical scope can happen without Struct:Block, parented by either PPI::Statement::Compound or Statement::Sub
 # XXX No, I still see no way a lexical scope can happen without Struct:Block, but it won't have a ::Compound or ::Sub parent if it is a `map` or `grep`; it just has a ::Statement parent then.
 
-
-# PPI::Statement::Compound
-#   PPI::Token::Word                'if'
-#   PPI::Structure::Condition       ( ... )
-#   PPI::Structure::Block           { ... }
-#   PPI::Token::Word                'elsif'
-#   PPI::Structure::Condition       ( ... )
-#   PPI::Structure::Block           { ... }
-#   PPI::Token::Word                'else'
-#   PPI::Structure::Block           { ... }
-
-# PPI::Statement::Sub
-#   PPI::Token::Word                'sub'
-#   PPI::Token::Word                'the_sub_name'
-#   PPI::Structure::Block           { ... }
-
-
-# PPI::Statement
-#   PPI::Token::Symbol              '%hash'
-#   PPI::Token::Operator            '='
-#   PPI::Token::Word                'map'
-#   PPI::Structure::Block           { ... }
-
 use PPI::Dumper;
 sub dump_it {
     die if @_ != 1;
@@ -57,7 +78,8 @@ sub dump_it {
     my $Dumper = PPI::Dumper->new(
         $thing_to_dump,
         content    => 1,
-        whitespace => 0,
+        # whitespace => 0,
+        whitespace => 1,
         memaddr    => 1,
     ) or die;
 
@@ -86,7 +108,7 @@ sub dump_it {
         my ( $addr, $ws_and_class, $content ) = @{$struct_aref};
         # $addr = sprintf '0x%016x', $addr;
         # $addr = sprintf '%016d', $addr;
-        my $level1 = $lex{$addr} // '';
+        my $level1 = sprintf '%-15s', ($lex{$addr} // '');
         # my $level2 = $lex2{$addr} ? '*' : '';
         my $level2 = $lex2_flipped{$addr} ? '*' : '';
         if ( not defined $content ) {
@@ -105,24 +127,8 @@ sub dump_it {
     say '---';
 }
 
-# use Scalar::Util qw(refaddr);
 sub address_of {
-    # Template code C<P> promises to pack a "pointer to a fixed length string".
-    # Isn't this what we want? Let's try:
-    #
-    #     # allocate some storage and pack a pointer to it
-    #     my $memory = "\x00" x $size;
-    #     my $memptr = pack( 'P', $memory );
-    #
-    # But wait: doesn't C<pack> just return a sequence of bytes? How can we pass this
-    # string of bytes to some C code expecting a pointer which is, after all,
-    # nothing but a number? The answer is simple: We have to obtain the numeric
-    # address from the bytes returned by C<pack>.
-    #
-    #     my $ptr = unpack( 'L!', $memptr );
-#     $addr = refaddr( $ref )
     return sprintf '0x%016x', $_[0]->refaddr;
-    # return join '', reverse unpack '(H2)*', pack 'L!', refaddr($_[0]);
 }
 
 # memaddr
@@ -130,7 +136,7 @@ sub address_of {
 #     True/false value, off by default.
 # refaddr method???
 
-if ( 1 == 0 ) {
+if ( 1 == 1 ) {
     # XXX
     # This code was to explore the parents of ::Block nodes.
     # It might be obsolete now.
@@ -203,39 +209,94 @@ if ( 1 == 0 ) {
     # Also, it looks like PPI::Statement::Sub returns false! XXX File a bug report!
     sub is_start_of_scope { return !! ( $_[0]->class eq 'PPI::Structure::Block' ) }
 
+    # Code adapted from recursive _dump() in PPI/Dumper.pm
+    # XXX Consider using the queuing code from PPI::Node::find() ???
     sub determine_lexical_scope_levels {
         die if @_ != 1;
         my ($Element) = @_;
-# say "Enter";
-        # my $top = $Element->top;
-        # warn 'ok? Not seen yet' if $top->class   ne 'PPI::Document';
-        # warn 'ok? Not seen yet' if $top->refaddr != $Element->refaddr;
+
+        # warn 'ok? Not seen yet' if $Element->top ne 'PPI::Document';
+
 
         # starting element; Possibly starting lexical scope
         my $element_started_scope = is_start_of_scope($Element);
-# say "yes started scope" if $element_started_scope;
 
         next_level() if $element_started_scope;
 
         my $ra = $Element->refaddr; # XXX use hex version?
-# Add code: If this is the start of a new level, then next/push. How to tell the difference?
+$addr_element{$ra} = $Element;
         die if exists $lex{$ra};
         $lex{$ra} = read_level();
-        # $lex{$ra} = $Element->isa('PPI::Node') && $Element->scope ? '!' : ' ';
         push @DEBUG, read_level;
 
+        $is_whitespace{$ra} = 1 if $Element->class eq 'PPI::Token::Whitespace';
+
+        my @loc = @{ $Element->location };
+        my ( $line, $rowchar, $col, $logical_line, $logical_file_name ) = @loc;
+        # $rowchar is the literal horizontal character, and $col is the visual column, taking into account tabbing.
+        $location{$ra} = [ @loc ];
+        push @{ $lines_AoA[ $line ] }, $ra;      # For each line of source, refaddrs.
+
+
         if ( $element_started_scope ) {
-# say Dumper 'Before', \@level;
             push_level() if $element_started_scope;
-# say Dumper 'After', \@level;
 
             # XXX Experimental; replace the lex level we just put into %lex, with the new incremented level.
             # This makes the ::Block show up at the same lex level as its contents.
             # We might not care. Play with enabling and disabling this line!
-            $lex{$ra} = read_level() if $BLOCK_IS_AT_SUBLEVEL;
+            # $lex{$ra} = read_level() if $BLOCK_IS_AT_SUBLEVEL;
 
             die if exists $lex2{ read_level() };
             $lex2{ read_level() } = $ra;
+        }
+
+        if ( $Element->class eq 'PPI::Token::Symbol' ) {
+            # push @{ $symbols{ $Element->symbol} }, $ra;
+            my $real_sym = $Element->symbol; # This shows @array when used as $array[3] !
+            push @{ $symbols{$real_sym} }, [ $ra, read_level() ];
+
+            $symbol_first_seen{$real_sym} //= [ $ra, $line, $rowchar ];
+
+# XXX Need to track where a simple my() can be used, vs where a statement must be inserted.
+            # XXX Need to add code to show location found, too?
+            # Hmmm. $grain is only found in one block, and it is written to on the first occurance.
+            # OK to add my, or my()???
+            # 0.8            32     $grain = 'wheat';
+            # 0.8            33     print "$grain";
+            # XXX Note that any parent being a sub may change things!
+            # ++ and -- are read-write. How to say it is OK to be undefined? Do I care?
+            
+            # 0              36 sub foo1 {
+            # 0.9            37     if ( $burned_out ) {
+            # 0.9.1          38         $unstable++;
+            # 0.9.1          39     }
+            # 0.9            40     if ( !$burned_out ) {
+            # 0.9.2          41         $unstable--;
+            # 0.9.2          42     }
+            # 0.9            43     print "hi!\n";
+            # 0              44 }
+            # $unstable occurs in 0.9.1 and 0.9.2, which is more than one level.
+            # Find lowest common parent, which is 0.9
+            # 0.9 is one level above the earliest occurance (0.9.1), so locate my() just before statement containing the 0.9.1 block.
+            
+            # 0              18 $i = 0;
+            # 0              19 while ($i++<5) {
+            # 0.4            20     $j = $i;
+            # 0              21 }
+            # 0              22 print "$j\n";
+            # $j must be defined at the line preceeding the statement that starts level 0.4,
+            # so before the `while` on 19.
+
+            # 0.6            !!
+            # 0.7            28 %hash = map { $_ => ++$c } grep { /a/ } grep /s/, qw( salami baloney );
+            # 0              !!
+            # 0.8            !!
+            # 0.9            29 %hash = map { $_ => ++$d } grep { /a/ } grep /s/, qw( salami baloney ); # Test redefiniion and $d not being initialized.
+            # Hmmm. The line contains 0.8 and 0.9, but $d is only in 0.8.
+            # It is a read-write, though.
+            # $d must have its my() just before the statement that defineds 0.8.
+
+            # XXX Need to test unknown_sub( $foo ); mechanism to determine r-o vs r-w 
         }
 
         # Recurse into our children
@@ -259,369 +320,244 @@ if ( 1 == 0 ) {
 determine_lexical_scope_levels($PPI_doc);
 %lex2_flipped = reverse %lex2;
 # print Dumper \%lex;
-print Dumper \%lex2;
-print Dumper \%lex2_flipped;
+# print Dumper \%lex2;
+# print Dumper \%lex2_flipped;
+# print Dumper \%location;
+# print Dumper \@lines_AoA;
+print Dumper \%symbols;
 # print Dumper \@DEBUG;
 dump_it($PPI_doc);
 
+# XXX Change from printing refaddr to using an array of Elements, with a single hash xref of refaddr-to-array-index.
+# This is so we can stop debugging with refaddrs, since they change from run to run.
 
-__END__
-# Find all the named subroutines
-my $sub_nodes = $PPI_doc->find(
-      sub { $_[1]->isa('PPI::Statement::Sub') and $_[1]->name }
-);
+# Print the original file's contents, showing the lexical level beside each line.
+if ( 1 == 1 ) {
+    my @lines = split "\n", $PPI_doc->serialize;
+    for my $i ( 0 .. $#lines ) {
+    # say '---';
+        my $line = $lines[$i];
+        my $num  = $i + 1;
+    
+        my @element_addresses_in_line = @{ $lines_AoA[$num] };
 
-PPI::Document
-isa PPI::Node
-    isa PPI::Element
--
-# Anything more elaborate, we go with the sub
-$Document->find( sub {
-      # At the top level of the file...
-      $_[1]->parent == $_[0]
-      and (
-              # ...find all comments and POD
-              $_[1]->isa('PPI::Token::Pod')
-              or
-              $_[1]->isa('PPI::Token::Comment')
-      )
-} );
-    The function will be passed two arguments, the top-level "PPI::Node" you
-    are searching in and the current PPI::Element that the condition is
-    testing.
+        # In most structures, there is whitespace (often newline) following the
+        # opening brace, but on the same line. We want to discount that whitespace
+        # when determining a line's lexical level, otherwise a line with an opening
+        # brace will *always* be in two levels!
+        my @non_whitespace_element_addresses_in_line = grep { !$is_whitespace{$_} } @element_addresses_in_line;
 
-    The anonymous function should return one of three values. Returning true
-    indicates a condition match, defined-false (0 or '') indicates no-match,
-    and "undef" indicates no-match and no-descend.
+        my %h;
+        $h{$_}++ for map { $lex{$_} }  @non_whitespace_element_addresses_in_line;
+        my @levels = sort keys %h;
 
-    In the last case, the tree walker will skip over anything below the
-    "undef"-returning element and move on to the next element at the same
-    level.
+        push @levels, $lex{ $element_addresses_in_line[0] } if ! @levels; # Caused by a whitespace-only line.
 
-    To halt the entire search and return "undef" immediately, a condition
-    function should throw an exception (i.e. "die").
+        # Lines can have multiple lexical levels if they are like:
+        #    @a = grep { $_ > 3 } @b;
+        # We list all but the last level on separate lines (to avoid messing up the indentation), and use !! as a visual marker for such occurances.
+        while ( @levels > 1 ) {
+            printf "%-7s\t%7s\n", shift(@levels), '!!';
+        }
 
-    Note that this same wanted logic is used for all methods documented to
-    have a "\&wanted" parameter, as this one does.
--
-statement
-  For a "PPI::Element" that is contained (at some depth) within a
-  PPI::Statement, the "statement" method will return the first parent
-  Statement object lexically 'above' the Element.
-
-  Returns a PPI::Statement object, which may be the same Element if the
-  Element is itself a PPI::Statement object.
-
-  Returns false if the Element is not within a Statement and is not itself a
-  Statement.
-
-my $Dumper = PPI::Dumper->new(
-    $PPI_doc,
-    content    => $content,
-    whitespace => $whitespace,
-) or die;
-
-my @lines = $Dumper->list;
-# use Data::Dumper; $Data::Dumper::Useqq=1;
-#print Dumper \@a;
-
-# This code aligns all the content on the right-hand side.
-my $re = qr{
-  ^
-    (   \s* \S+ )
-    (?: [ ]* \t )?
-    (   \S .*   )?
-  $
-}msx;
-my @structs;
-my $max_len = 0;
-for my $line (@lines) {
-    my ( $ws_and_class, $content ) = ( $line =~ /$re/ ) or warn;
-    my $len = length $ws_and_class;
-    $max_len = $len if $max_len < $len;
-    push @structs, [ $ws_and_class, $content ];
-}
-
-for my $struct_aref (@structs) {
-    my ( $ws_and_class, $content ) = @{$struct_aref};
-    if ( not defined $content ) {
-        print $ws_and_class, "\n";
-    }
-    else {
-        printf "%-${max_len}s   %s\n", $ws_and_class, $content;
+        die if @levels != 1;
+        printf "%-7s\t%7d\t%s\n", $levels[0], $num, $line;
     }
 }
 
+# Need a structure of first occurrence of each var in each scope it appears in?
+for my $symbol ( sort keys %symbols ) {
+say "!!! $symbol";
+    my $occurances_aref = $symbols{$symbol};
+    
+    for my $occurance_aref ( @{$occurances_aref} ) {
+        my ( $ra, $level ) = @{$occurance_aref};
+        say "$ra, $level";
+    }
+}
+
+my @symbols_ordered = sort { 
+       $symbol_first_seen{$a}[1] <=> $symbol_first_seen{$b}[1] # line
+    or $symbol_first_seen{$a}[2] <=> $symbol_first_seen{$b}[2] # rowchar
+} keys %symbol_first_seen;
+
+# XXX Move the symbol itself into its own hash for easier sorting and unpacking.
+for my $sym (@symbols_ordered) {
+    my ( $ra, $line, $rowchar ) = @{ $symbol_first_seen{$sym} };
+    my $Element = $addr_element{$ra};
+    my $statement = $Element->statement or die; # First parent Statement object lexically 'above' the Element. (or equal to, if Element is a Statement)
+    say sprintf "%-15s\t%15s\t%2d\t%2d\t%s", $sym, $ra, $line, $rowchar, $statement->refaddr;
+}
+
+# XXX Everything using refaddr must be calculated and processed to the
+# point of being able to remove the refaddrs *before* doing any
+# modifications. Build a complete worklist. Undef all the hashes just to be
+# sure that they cannot be used by a future maintenance programmer; it
+# would be a huge source of difficult bugs!
+
+# Making two worklists; one for vars that just need a prefixed `my`, and one for 'my' statements that need to be added.
+# XXX Custom code to use the new ::Variable type of statements where available?
+
+
 __END__
+FAQ
+If I remove every my(), and then run your program, will it put the my's in the right place?
+0. Removing all the my()s is not the same as turning off `strict` (Which *should* allow a correct program to stay correct).
+1. There is an option for that.
+2. Not necessarily. (or, Only if you never redefine a var).
+   If you remove all the my()s in your program, you might break your program! Running this modernizer on your then-broken code should result in still-broken code.
+   See known_bad_02.pl
+3. No (if you use closures); removing the my() means that you will get the current global/package value of $foo, not your own private copy.
+    See known_bad_01.pl
+What is too clever?
+    This idiom from Getopt::Long...
+        GetOptions(
+            length  => \( my $length  ),
+            file    => \( my $data    ),
+            verbose => \( my $verbose ),
+        ) or die;
+-
+same
+same
 
-1 #!/usr/bin/env perl
-1 use 5.010;
-
-1 $fruit = 'apple';
-1 print "$fruit\n";
-
-1 if ( $diet = 'paleo' )
 {
-    $meat = 'Yes'; # `my` gets added here
+    same depth, but different scope
 }
-else {
-    $meat = 'Maybe';
+{
+    same depth, but different scope
 }
-print "$meat\n";
 
 
-PPI::Document
-  PPI::Token::Comment               '#!/usr/bin/env perl\n'
-  PPI::Statement::Include
-    PPI::Token::Word                'use'
-    PPI::Token::Number::Float       '5.010'
-    PPI::Token::Structure           ';'
-  PPI::Statement
-    PPI::Token::Symbol              '$fruit'
-    PPI::Token::Operator            '='
-    PPI::Token::Quote::Single       ''apple''
-    PPI::Token::Structure           ';'
-  PPI::Statement
-    PPI::Token::Word                'print'
-    PPI::Token::Quote::Double       '"$fruit\n"'
-    PPI::Token::Structure           ';'
-  PPI::Statement::Compound
-    PPI::Token::Word                'if'
-    PPI::Structure::Condition       ( ... )
-      PPI::Statement::Expression
-        PPI::Token::Symbol          '$diet'
-        PPI::Token::Operator        '='
-        PPI::Token::Quote::Single   ''paleo''
-    PPI::Structure::Block           { ... }
-      PPI::Statement
-        PPI::Token::Symbol          '$meat'
-        PPI::Token::Operator        '='
-        PPI::Token::Quote::Single   ''Yes''
-        PPI::Token::Structure       ';'
-      PPI::Token::Comment           '# `my` gets added here'
-    PPI::Token::Word                'else'
-    PPI::Structure::Block           { ... }
-      PPI::Statement
-        PPI::Token::Symbol          '$meat'
-        PPI::Token::Operator        '='
-        PPI::Token::Quote::Single   ''Maybe''
-        PPI::Token::Structure       ';'
-  PPI::Statement
-    PPI::Token::Word                'print'
-    PPI::Token::Quote::Double       '"$meat\n"'
-    PPI::Token::Structure           ';'
-.
-__END__
-PPI::Document
-  PPI::Token::Comment               '#!/usr/bin/env perl\n'
-  PPI::Statement::Include
-    PPI::Token::Word                'use'
-    PPI::Token::Number::Float       '5.010'
-    PPI::Token::Structure           ';'
-  PPI::Statement
-    PPI::Token::Symbol              '$fruit'
-    PPI::Token::Operator            '='
-    PPI::Token::Quote::Single       ''apple''
-    PPI::Token::Structure           ';'
-  PPI::Statement
-    PPI::Token::Word                'print'
-    PPI::Token::Quote::Double       '"$fruit\n"'
-    PPI::Token::Structure           ';'
-  PPI::Statement::Compound
-    PPI::Token::Word                'if'
-    PPI::Structure::Condition       ( ... )
-      PPI::Statement::Expression
-        PPI::Token::Symbol          '$diet'
-        PPI::Token::Operator        '='
-        PPI::Token::Quote::Single   ''paleo''
-    PPI::Structure::Block           { ... }
-      PPI::Statement
-        PPI::Token::Symbol          '$meat'
-        PPI::Token::Operator        '='
-        PPI::Token::Quote::Single   ''Yes''
-        PPI::Token::Structure       ';'
-      PPI::Token::Comment           '# `my` gets added here'
-    PPI::Token::Word                'else'
-    PPI::Structure::Block           { ... }
-      PPI::Statement
-        PPI::Token::Symbol          '$meat'
-        PPI::Token::Operator        '='
-        PPI::Token::Quote::Single   ''Maybe''
-        PPI::Token::Structure       ';'
-  PPI::Statement
-    PPI::Token::Word                'print'
-    PPI::Token::Quote::Double       '"$meat\n"'
-    PPI::Token::Structure           ';'
+    deeper
+shallow
 
 
-.
-PPI::Statement::Compound
-  PPI::Structure::Block           { ... }
-    PPI::Statement
-      PPI::Token::Symbol          '$grain'
-      PPI::Token::Operator        '='
-      PPI::Token::Quote::Single   ''wheat''
-      PPI::Token::Structure       ';'
-    PPI::Statement
-      PPI::Token::Word            'print'
-      PPI::Token::Quote::Double   '"$grain"'
-      PPI::Token::Structure       ';'
-.
-PPI::Statement::Sub
-  PPI::Token::Word                'sub'
-  PPI::Token::Word                'foo1'
-  PPI::Structure::Block           { ... }
-    PPI::Statement
-      PPI::Token::Word            'print'
-      PPI::Token::Quote::Double   '"hi!\n"'
-      PPI::Token::Structure       ';'
+shallow
+   deeper
 
----
-http://cpansearch.perl.org/src/MITHALDU/PPI-1.220/lib/PPI/Node.pm
-    sub find {
-        my $self   = shift;
-        my $wanted = $self->_wanted(shift) or return undef;
 
-        # Use a queue based search, rather than a recursive one
-        my @found;
-        my @queue = @{$self->{children}};
-        my $ok = eval {
-            while ( @queue ) {
-                my $Element = shift @queue;
-                my $rv      = &$wanted( $self, $Element );
-                push @found, $Element if $rv;
+LLL
+LLR
+LRL
+LRR
+RLL
+RLR
+RRL
+RRR
+Need to mark the lexical scope info with detail of "this is a sub", or "this is at any depth, within a sub"?
+27 depth variations; A is mainline, B is deeper (1+ levels), C is 1+ deeper than B. XXX What about sub{} ???
+AAA all at 0 depth. If first is write-only, 
+AAB
+AAC
+ABA
+ABB
+ABC
+ACA
+ACB
+ACC
+BAA
+BAB
+BAC
+BBA
+BBB
+BBC
+BCA
+BCB
+BCC
+CAA
+CAB
+CAC
+CBA
+CBB
+CBC
+CCA
+CCB
+CCC
 
-                # Support "don't descend on undef return"
-                next unless defined $rv;
+BBB==CCC            != AAA ??????
+BBA==CCB==CCA
+CBC==CAC==BAB
+CBB==CAA==BAA
+same
+same
+same
 
-                # Skip if the Element doesn't have any children
-                next unless $Element->isa('PPI::Node');
+shallow
+shallow
+    deeper
 
-                # Depth-first keeps the queue size down and provides a
-                # better logical order.
-                if ( $Element->isa('PPI::Structure') ) {
-                    unshift @queue, $Element->finish if $Element->finish;
-                    unshift @queue, @{$Element->{children}};
-                    unshift @queue, $Element->start if $Element->start;
-                } else {
-                    unshift @queue, @{$Element->{children}};
-                }
-            }
-            1;
-        };
-        if ( !$ok ) {
-            # Caught exception thrown from the wanted function
-            return undef;
-        }
+shallow
+    deeper
+shallow
 
-    	@found ? \@found : '';
+shallow
+    deeper
+        deepest
+
+Categorize every use of a var as ro,rw,wo,, wr?, cannot determine, not yet determined
+    $foo = $foo + $foo
+In a if statement, w if left of eq, w if ++ or --, (subcall & $subs_are_safe; pass), (rw if in subcall), ro
+
+XXX String eval flag!
+new block:
+# Analyzing all variable usage
+    Parse each statement? Classify each var for each statement, as a intermediate summarizing/simplifying step?
+
+140218823441552   0.10                         PPI::Statement
+140218823440880   0.10                           PPI::Token::Symbol             '$grain'
+140218823440952   0.10                           PPI::Token::Whitespace         ' '
+140218823441024   0.10                           PPI::Token::Operator           '='
+140218823441096   0.10                           PPI::Token::Whitespace         ' '
+140218823441168   0.10                           PPI::Token::Quote::Single      ''wheat''
+140218823441288   0.10                           PPI::Token::Structure          ';'
+140218823385208   0.10                         PPI::Token::Whitespace           '\n'
+if the schildren of a plain PPI::Statement (or maybe also PPI::Statement::Expression) are:
+    Symbol('$TheVar') Operator('=')
+, and the symbol does not appear anywhere else in the statement, then that symbol is WO.
+If the symbol does appear after [Symbol('$TheVar') Operator('=')], then it is RW.
+XXX A Sub-call could be altering $TheVar as a non-param, causing RO to be falsely indicated.
+XXX Also possible false RO if complex sequence causes a chain of vars to write an old $TheVar value into it.
+
+XXX Note: need to distinguish second+ statement on a single line? What if we want to put a line just above it? Oh, I guess this is not needed.
+
+Make "Will-fail" testcase files:
+    sub TheSub {
+        $foo = 7 + $bar + $foo;
+        return $bar;
     }
+    $foo = 3 + TheSub(); # $foo is actually a later element, but hidden. Causes RO instead of proper RW.
 
-http://cpansearch.perl.org/src/MITHALDU/PPI-1.220/lib/PPI/Dumper.pm
-    sub _dump {
-        my $self    = ref $_[0] ? shift : shift->new(shift);
-        my $Element = _INSTANCE($_[0], 'PPI::Element') ? shift : $self->{root};
-        my $indent  = shift || '';
-        my $output  = shift || [];
 
-        # Print the element if needed
-        my $show = 1;
-        if ( $Element->isa('PPI::Token::Whitespace') ) {
-            $show = 0 unless $self->{display}->{whitespace};
-        } elsif ( $Element->isa('PPI::Token::Comment') ) {
-            $show = 0 unless $self->{display}->{comments};
-        }
-        push @$output, $self->_element_string( $Element, $indent ) if $show;
+What kind of statements are there?
+    PPI::Statement                	The base class for Perl statements                 		1.220
+    PPI::Statement::Break         	Statements which break out of normal statement flow		1.220
+    PPI::Statement::Compound      	Describes all compound statements                  		1.220
+    PPI::Statement::Data          	The __DATA__ section of a file                     		1.220
+    PPI::Statement::End           	Content after the __END__ of a module              		1.220
+    PPI::Statement::Expression    	A generic and non-specialised statement            		1.220
+    PPI::Statement::Given         	A given-when statement                             		1.220
+    PPI::Statement::Include       	Statements that include other code                 		1.220
+    PPI::Statement::Include::Perl6	Inline Perl 6 file section                         		1.220
+    PPI::Statement::Null          	A useless null statement                           		1.220
+    PPI::Statement::Package       	A package statement                                		1.220
+    PPI::Statement::Scheduled     	A scheduled code block                             		1.220
+    PPI::Statement::Sub           	Subroutine declaration                             		1.220
+    PPI::Statement::Unknown       	An unknown or transient statement                  		1.220
+    PPI::Statement::UnmatchedBrace	Isolated unmatched brace                           		1.220
+    PPI::Statement::Variable      	Variable declaration statements                    		1.220
+    PPI::Statement::When          	A when statement                                   		     
+                                  	                                                   		     
+http://search.cpan.org/dist/PPI/lib/PPI/Statement.pm
+specialized
+    Answer whether this is a plain statement or one that has more significance.
+    Returns true if the statement is a subclass of this one, false otherwise.
 
-        # Recurse into our children
-        if ( $Element->isa('PPI::Node') ) {
-            my $child_indent = $indent . $self->{indent_string};
-            foreach my $child ( @{$Element->{children}} ) {
-                $self->_dump( $child, $child_indent, $output );
-            }
-        }
+scan for PPI::Statement::UnmatchedBrace
 
-        $output;
-    }
-    sub _dump {
-        my $self    = ref $_[0] ? shift : shift->new(shift);
-        my $Element = _INSTANCE($_[0], 'PPI::Element') ? shift : $self->{root};
-        my $level  = shift || '';
-        my $output  = shift || [];
+Need a way to know whether any Element is inside a Sub or not.
 
-        push @$output, $self->_element_string( $Element, $level );
 
-        # Recurse into our children
-        if ( $Element->isa('PPI::Node') ) {
-            my $child_level = $level . add_a_level();
-            for my $child ( @{ $Element->{children} } ) {
-                # entering child
-                $self->_dump( $child, $child_indent, $output );
-                # exiting child
-            }
-        }
-
-        $output;
-    }
-.
-
-Make a separate counter that is the virtual last element of @level? Ignore last part of @level when making dot form?
-Build a tree, too?
-MAIN     #!/usr/bin/env perl
-MAIN     use 5.010;
-MAIN     
-MAIN     $fruit = 'apple';
-MAIN     print "$fruit\n";
-MAIN     
-MAIN     if ( $diet = 'paleo' )
-MAIN.1?  {
-MAIN.1      $meat = 'Yes'; # `my` gets added here
-MAIN.1?  }
-MAIN     elsif ( $diet = 'vegan' )
-MAIN.2?  {
-MAIN.2       $meat = 'No';
-MAIN.2?  }
-MAIN     else
-MAIN.3?  {
-MAIN.3      $meat = 'Maybe';
-MAIN.3?  }
-MAIN     print "$meat\n";
-MAIN     
-MAIN     $i = 0;
-MAIN     while ($i++<5)
-MAIN.4?  {
-MAIN.4       $j = $i;
-MAIN.4?  }
-MAIN     print "$j\n";
-MAIN     
-MAIN     @array = grep
-MAIN.5?  {
-MAIN.5       $_ % 2 == 0
-MAIN.5?  }
-MAIN     1 .. 5;
-MAIN     
-MAIN     $c = 0;
-MAIN     %hash = map
-MAIN.6?  {
-MAIN.6       $_ => $c++
-MAIN.6?  }
-MAIN     qw( salami baloney );
-MAIN     
-MAIN     # Bug! Adding this block causes Document->complete to fail!!!!
-MAIN.7?  {
-MAIN.7       $grain = 'wheat';
-MAIN.7       print "$grain";
-MAIN.7?  }
-MAIN     
-MAIN     sub foo1
-MAIN.8?  {
-MAIN.8       if ( $burned_out )
-MAIN.8.1?    {
-MAIN.8.1         $unstable++;
-MAIN.8.1?    }
-MAIN.8       if ( !$burned_out )
-MAIN.8.2?    {
-MAIN.8.2         $unstable--;
-MAIN.8.2?    }
-MAIN.8       print "hi!\n";
-MAIN.8?  }
+Probably fail:
+    sub foo {
+        ($x, $x, $y) = @_; # Ignore first parameter.
+        # XXX Test this.
