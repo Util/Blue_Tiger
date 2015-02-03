@@ -45,7 +45,10 @@ my %symbol_first_seen; # HoA of '@array' => [ refaddr, $line, $rowcol ];
 my %addr_element;   # Every element from the PPI tree, indexed by refaddr for reverse lookup.
 
 my @DEBUG;
-my @ELEMENTS;       # Linearly assigned AoR; Fields are:
+
+# XXX Hmmm. I might want a separate array just for $Element itself, to ease dumping?
+# XXX Delay this for now
+# my @ELEMENTS;       # Linearly assigned AoR; Fields are:
     # INDEX         => $ELEMENTS.index_number, 
     # ELEMENT       => $Element, # pointer to the real PPI::Element ,
     # REFADDR       => $Element->refaddr,
@@ -237,6 +240,19 @@ $addr_element{$ra} = $Element;
         $location{$ra} = [ @loc ];
         push @{ $lines_AoA[ $line ] }, $ra;      # For each line of source, refaddrs.
 
+        # {
+        #     my $next_element_number = 1 + $#ELEMENTS;
+        #     # XXX Not testted against $element_started_scope !!!
+        #     push @ELEMENTS, {
+        #         INDEX         => $next_element_number,
+        #         ELEMENT       => $Element, # pointer to the real PPI::Element ,
+        #         REFADDR       => $Element->refaddr,
+        #         LOCATION      => [ @{ $Element->location } ],
+        #         IS_WHITESPACE => !!($Element->class eq 'PPI::Token::Whitespace'),
+        #         # IS_IN_SUB     => Bool,
+        #         LEXICAL_SCOPE => read_level(),
+        #     };
+        # }
 
         if ( $element_started_scope ) {
             push_level() if $element_started_scope;
@@ -325,6 +341,8 @@ determine_lexical_scope_levels($PPI_doc);
 # print Dumper \%location;
 # print Dumper \@lines_AoA;
 print Dumper \%symbols;
+# print Dumper [@ELEMENTS[0..3]];
+# print Dumper \@ELEMENTS;
 # print Dumper \@DEBUG;
 dump_it($PPI_doc);
 
@@ -400,164 +418,3 @@ for my $sym (@symbols_ordered) {
 
 
 __END__
-FAQ
-If I remove every my(), and then run your program, will it put the my's in the right place?
-0. Removing all the my()s is not the same as turning off `strict` (Which *should* allow a correct program to stay correct).
-1. There is an option for that.
-2. Not necessarily. (or, Only if you never redefine a var).
-   If you remove all the my()s in your program, you might break your program! Running this modernizer on your then-broken code should result in still-broken code.
-   See known_bad_02.pl
-3. No (if you use closures); removing the my() means that you will get the current global/package value of $foo, not your own private copy.
-    See known_bad_01.pl
-What is too clever?
-    This idiom from Getopt::Long...
-        GetOptions(
-            length  => \( my $length  ),
-            file    => \( my $data    ),
-            verbose => \( my $verbose ),
-        ) or die;
--
-same
-same
-
-{
-    same depth, but different scope
-}
-{
-    same depth, but different scope
-}
-
-
-    deeper
-shallow
-
-
-shallow
-   deeper
-
-
-LLL
-LLR
-LRL
-LRR
-RLL
-RLR
-RRL
-RRR
-Need to mark the lexical scope info with detail of "this is a sub", or "this is at any depth, within a sub"?
-27 depth variations; A is mainline, B is deeper (1+ levels), C is 1+ deeper than B. XXX What about sub{} ???
-AAA all at 0 depth. If first is write-only, 
-AAB
-AAC
-ABA
-ABB
-ABC
-ACA
-ACB
-ACC
-BAA
-BAB
-BAC
-BBA
-BBB
-BBC
-BCA
-BCB
-BCC
-CAA
-CAB
-CAC
-CBA
-CBB
-CBC
-CCA
-CCB
-CCC
-
-BBB==CCC            != AAA ??????
-BBA==CCB==CCA
-CBC==CAC==BAB
-CBB==CAA==BAA
-same
-same
-same
-
-shallow
-shallow
-    deeper
-
-shallow
-    deeper
-shallow
-
-shallow
-    deeper
-        deepest
-
-Categorize every use of a var as ro,rw,wo,, wr?, cannot determine, not yet determined
-    $foo = $foo + $foo
-In a if statement, w if left of eq, w if ++ or --, (subcall & $subs_are_safe; pass), (rw if in subcall), ro
-
-XXX String eval flag!
-new block:
-# Analyzing all variable usage
-    Parse each statement? Classify each var for each statement, as a intermediate summarizing/simplifying step?
-
-140218823441552   0.10                         PPI::Statement
-140218823440880   0.10                           PPI::Token::Symbol             '$grain'
-140218823440952   0.10                           PPI::Token::Whitespace         ' '
-140218823441024   0.10                           PPI::Token::Operator           '='
-140218823441096   0.10                           PPI::Token::Whitespace         ' '
-140218823441168   0.10                           PPI::Token::Quote::Single      ''wheat''
-140218823441288   0.10                           PPI::Token::Structure          ';'
-140218823385208   0.10                         PPI::Token::Whitespace           '\n'
-if the schildren of a plain PPI::Statement (or maybe also PPI::Statement::Expression) are:
-    Symbol('$TheVar') Operator('=')
-, and the symbol does not appear anywhere else in the statement, then that symbol is WO.
-If the symbol does appear after [Symbol('$TheVar') Operator('=')], then it is RW.
-XXX A Sub-call could be altering $TheVar as a non-param, causing RO to be falsely indicated.
-XXX Also possible false RO if complex sequence causes a chain of vars to write an old $TheVar value into it.
-
-XXX Note: need to distinguish second+ statement on a single line? What if we want to put a line just above it? Oh, I guess this is not needed.
-
-Make "Will-fail" testcase files:
-    sub TheSub {
-        $foo = 7 + $bar + $foo;
-        return $bar;
-    }
-    $foo = 3 + TheSub(); # $foo is actually a later element, but hidden. Causes RO instead of proper RW.
-
-
-What kind of statements are there?
-    PPI::Statement                	The base class for Perl statements                 		1.220
-    PPI::Statement::Break         	Statements which break out of normal statement flow		1.220
-    PPI::Statement::Compound      	Describes all compound statements                  		1.220
-    PPI::Statement::Data          	The __DATA__ section of a file                     		1.220
-    PPI::Statement::End           	Content after the __END__ of a module              		1.220
-    PPI::Statement::Expression    	A generic and non-specialised statement            		1.220
-    PPI::Statement::Given         	A given-when statement                             		1.220
-    PPI::Statement::Include       	Statements that include other code                 		1.220
-    PPI::Statement::Include::Perl6	Inline Perl 6 file section                         		1.220
-    PPI::Statement::Null          	A useless null statement                           		1.220
-    PPI::Statement::Package       	A package statement                                		1.220
-    PPI::Statement::Scheduled     	A scheduled code block                             		1.220
-    PPI::Statement::Sub           	Subroutine declaration                             		1.220
-    PPI::Statement::Unknown       	An unknown or transient statement                  		1.220
-    PPI::Statement::UnmatchedBrace	Isolated unmatched brace                           		1.220
-    PPI::Statement::Variable      	Variable declaration statements                    		1.220
-    PPI::Statement::When          	A when statement                                   		     
-                                  	                                                   		     
-http://search.cpan.org/dist/PPI/lib/PPI/Statement.pm
-specialized
-    Answer whether this is a plain statement or one that has more significance.
-    Returns true if the statement is a subclass of this one, false otherwise.
-
-scan for PPI::Statement::UnmatchedBrace
-
-Need a way to know whether any Element is inside a Sub or not.
-
-
-Probably fail:
-    sub foo {
-        ($x, $x, $y) = @_; # Ignore first parameter.
-        # XXX Test this.
