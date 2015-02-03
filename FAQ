@@ -44,3 +44,13 @@ A:  For a confluence of reasons:
       _Tigers_ football team, whose colors are orange and
       _blue_.
     * Much of the code was written overlooking a butterfly garden.
+
+Q:  Why didn't you use Perl 6 to write the translator itself?
+A:  Good question; after all, the new Perl 6 "grammars" are a powerful
+    object-oriented fusion of Perl 5's regexes and Parse::RecDescent.
+    However, the few Perl 6 grammars for parsing Perl 5 are all
+    experimental, and are not mature/stable/complete/API'ed enough to
+    support this project. Speed is also a big issue during development.
+    Once something like PPI is written in Perl 6, and Perl 6
+    implementations get fast enough to not impede the translator
+    development, then this whole project might be re-written in Perl 6.
