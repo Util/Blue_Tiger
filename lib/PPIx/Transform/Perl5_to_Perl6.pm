@@ -138,6 +138,7 @@ sub _convert_Perl5_PPI_to_Perl6_PPI {
     $change_count += $self->_change_mapish_expr_to_block($PPI_doc);
     $change_count += $self->_change_foreach_my_lexvar_to_arrow($PPI_doc);
     $change_count += $self->_remove_obsolete_pragmas_and_shbang($PPI_doc);
+    $change_count += $self->_optionally_change_qw_to_arrow_quotes($PPI_doc);
 
     return $change_count;
 }
@@ -724,6 +725,31 @@ sub _remove_obsolete_pragmas_and_shbang {
                 $count++;
             }
             $PPI_doc->remove_child($include);
+            $count++;
+        }
+    }
+
+    return $count;
+}
+
+sub _optionally_change_qw_to_arrow_quotes {
+    croak 'Wrong number of arguments passed to method' if @_ != 2;
+    my ( $self, $PPI_doc ) = @_;
+    croak 'Parameter 2 must be a PPI::Document!' if !_INSTANCE($PPI_doc, 'PPI::Document');
+
+    # PPI::Statement::Variable
+    #   PPI::Token::Word                'my'
+    #   PPI::Token::Symbol              '@aaa'
+    #   PPI::Token::Operator            '='
+    #   PPI::Token::QuoteLike::Words    'qw( a b c d e f g )'
+    #   PPI::Token::Structure           ';'
+
+    my $count = 0;
+
+    # qw is valid with any paired delimiters, *except* parens, which would make it a sub call.
+    for my $qw ( _get_all( $PPI_doc, 'Token::QuoteLike::Words' ) ) {
+        if ( $qw =~ m{ \A qw\(( .+ )\) \z }msx ) {
+            $qw->set_content( "<$1>" );
             $count++;
         }
     }
