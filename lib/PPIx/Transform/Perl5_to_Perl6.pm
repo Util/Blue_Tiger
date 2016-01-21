@@ -137,6 +137,7 @@ sub _convert_Perl5_PPI_to_Perl6_PPI {
     $change_count += $self->_add_a_comma_after_mapish_blocks($PPI_doc);
     $change_count += $self->_change_mapish_expr_to_block($PPI_doc);
     $change_count += $self->_change_foreach_my_lexvar_to_arrow($PPI_doc);
+    $change_count += $self->_remove_obsolete_pragmas_and_shbang($PPI_doc);
 
     return $change_count;
 }
@@ -667,6 +668,66 @@ sub _change_foreach_my_lexvar_to_arrow {
 
         $count++;
     }
+    return $count;
+}
+
+sub _remove_obsolete_pragmas_and_shbang {
+    croak 'Wrong number of arguments passed to method' if @_ != 2;
+    my ( $self, $PPI_doc ) = @_;
+    croak 'Parameter 2 must be a PPI::Document!' if !_INSTANCE($PPI_doc, 'PPI::Document');
+
+    # PPI::Token::Comment               '#!/usr/bin/env perl\n'
+    # PPI::Statement::Include
+    #   PPI::Token::Word                'use'
+    #   PPI::Token::Word                'strict'
+    #   PPI::Token::Structure           ';'
+    # PPI::Statement::Include
+    #   PPI::Token::Word                'use'
+    #   PPI::Token::Word                'warnings'
+    #   PPI::Token::Structure           ';'
+
+    my $count = 0;
+
+    # XXX Improve handling of whitespace removal.
+    # XXX Add "use v6;" ???
+
+    # XXX Restructure to look at siblings instead?
+    # XXX remove_child vs delete???
+    my $first_non_ws_element = $PPI_doc->find_first( sub { not $_[1]->isa('PPI::Token::Whitespace') } )
+        or return;
+    if ( $first_non_ws_element->isa('PPI::Token::Comment') ) {
+        if ( $first_non_ws_element =~ m{ \A \s* [#]!/usr/bin/ (?:perl|env\s+perl) \s* \z }msx ) {
+            my $ws;
+            if ( $ws = $first_non_ws_element->next_sibling and $ws->isa('PPI::Token::Whitespace') ) {
+                $PPI_doc->remove_child($ws);
+                $count++;
+            }
+            $PPI_doc->remove_child($first_non_ws_element);
+            $count++;
+
+            my $e1;
+            while ( $e1 = $PPI_doc->find_first(sub {1}) and $e1->isa('PPI::Token::Whitespace') ) {
+                $PPI_doc->remove_child($e1);
+                $count++;
+            }
+        }
+
+    }
+
+    for my $include ( _get_all( $PPI_doc, 'Statement::Include' ) ) {
+        # XXX Add code to issue info about the removal
+        # XXX Add code to give more info on specific warnings and on partial strict.
+        if ( $include =~ m{ \A \s* use \s+ (?:strict|warnings) \s* [;]? \s* \z }msx ) {
+            my $ws;
+            if ( $ws = $include->next_sibling and $ws->isa('PPI::Token::Whitespace') ) {
+                $PPI_doc->remove_child($ws);
+                $count++;
+            }
+            $PPI_doc->remove_child($include);
+            $count++;
+        }
+    }
+
     return $count;
 }
 
