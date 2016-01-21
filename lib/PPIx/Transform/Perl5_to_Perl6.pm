@@ -52,6 +52,9 @@ our $VERSION = '0.01';
     my $code_out = $PPI_doc->serialize;
     # $code_out contains '$x = $y ~ $z'
 
+    # Or, run this from the command line:
+    #   bin/p526 path/to/program.pl > program_and_warnings.p6
+
 =head1 DESCRIPTION
 
 This class implements a document transform that will translate Perl 5 source
