@@ -600,7 +600,7 @@ sub _change_foreach_my_lexvar_to_arrow {
 
         my @c = $statement->children;
 
-        _eat_optional_whilespace(\@c); # XXX Can this really occur here?
+        _eat_optional_whitespace(\@c); # XXX Can this really occur here?
 
         # Change keyword "foreach" to "for" if needed.
         # Keyword is not needed in @c after this point.
@@ -616,7 +616,7 @@ sub _change_foreach_my_lexvar_to_arrow {
             }
         }
 
-        _eat_optional_whilespace(\@c);
+        _eat_optional_whitespace(\@c);
 
         # Peek at next element.
         # Remove `my` if it was there, and register whether it was there, for later use.
@@ -631,7 +631,7 @@ sub _change_foreach_my_lexvar_to_arrow {
             }
         }
 
-        _eat_optional_whilespace(\@c);
+        _eat_optional_whitespace(\@c);
 
         # Peek at next element.
         # Remove $VAR if it was there, and register $VAR, or $_ if absent.
@@ -649,7 +649,7 @@ sub _change_foreach_my_lexvar_to_arrow {
         # die unless @c and $c[0]->class eq 'PPI::Token::Symbol';
         # my $var = shift(@c)->remove or die;
 
-        _eat_optional_whilespace(\@c);
+        _eat_optional_whitespace(\@c);
 
         # Remove parens from (LIST)
         die unless @c and $c[0]->class eq 'PPI::Structure::List';
@@ -770,7 +770,7 @@ sub _make_a_block {
     return $new_block;
 }
 
-sub _eat_optional_whilespace {
+sub _eat_optional_whitespace {
     my ($elements_aref) = @_;
     return unless @{$elements_aref}
               and   $elements_aref->[0]->class eq 'PPI::Token::Whitespace';
