@@ -288,6 +288,8 @@ sub _change_sigils {
             $count++;
         }
     }
+
+    return $count;
 }
 
 sub _change_casts {
@@ -809,6 +811,8 @@ sub log_warn {
     else {
         carp $message;
     }
+
+    return;
 }
 
 1;
