@@ -139,6 +139,7 @@ sub _convert_Perl5_PPI_to_Perl6_PPI {
     $change_count += $self->_change_foreach_my_lexvar_to_arrow($PPI_doc);
     $change_count += $self->_remove_obsolete_pragmas_and_shbang($PPI_doc);
     $change_count += $self->_optionally_change_qw_to_arrow_quotes($PPI_doc);
+    $change_count += $self->_remove_parens_from_conditionals($PPI_doc);
 
     return $change_count;
 }
@@ -729,6 +730,77 @@ sub _remove_obsolete_pragmas_and_shbang {
             $PPI_doc->remove_child($include);
             $count++;
         }
+    }
+
+    return $count;
+}
+
+# XXX Relies on the fact that PPI parses the whitespace inside the parens as being outside of them.
+sub _remove_parens_from_conditionals {
+    croak 'Wrong number of arguments passed to method' if @_ != 2;
+    my ( $self, $PPI_doc ) = @_;
+    croak 'Parameter 2 must be a PPI::Document!' if !_INSTANCE($PPI_doc, 'PPI::Document');
+    # PPI::Statement::Compound
+    #   PPI::Token::Word                'if'
+    #   PPI::Structure::Condition       ( ... )
+    #     PPI::Statement::Expression              $x eq $y
+    #   PPI::Structure::Block           { ... }   say "Hi"
+    #   PPI::Token::Word                'elsif'
+    #   PPI::Structure::Condition       ( ... )
+    #     PPI::Statement::Expression              $x gt $y
+    #   PPI::Structure::Block           { ... }   say "Ho"
+    #   PPI::Token::Word                'elsif'
+    #   PPI::Structure::Condition       ( ... )
+    #     PPI::Statement::Expression              $x le $y
+    #   PPI::Structure::Block           { ... }   say "He"
+
+    my %wanted = map { $_ => 1 } qw( if elsif unless while );
+
+    my $count = 0;
+    for my $compound ( _get_all( $PPI_doc, 'Statement::Compound' ) ) {
+        my @sc = $compound->schildren;
+
+        for my $i ( 0+1 .. $#sc-1 ) { 
+            my ( $prior, $this, $next ) = @sc[ $i-1, $i, $i+1 ];
+
+            next if $this->class ne 'PPI::Structure::Condition';
+
+            warn if $prior->class ne 'PPI::Token::Word'
+                 or !$wanted{$prior->content};
+
+            warn if $next->class ne 'PPI::Structure::Block';
+
+            warn if $this->start ->content ne '('
+                 or $this->finish->content ne ')';
+
+            # Remove the parens
+            $this->start ->set_content('');
+            $this->finish->set_content('');
+            $count++;
+
+            # Fix the whitespace
+            my $express;
+            if ( $express = _only_schild( $this, 'PPI::Statement::Expression' )
+              or $express = _only_schild( $this, 'PPI::Statement' )
+            ) {
+                my $sib;
+                while ( $sib = $express->next_sibling     and $sib->class eq 'PPI::Token::Whitespace' ) {
+                    $sib->delete or warn;
+                }
+                while ( $sib = $express->previous_sibling and $sib->class eq 'PPI::Token::Whitespace' ) {
+                    $sib->delete or warn;
+                }
+            }
+            else {
+                warn 'XXX Unexpected PPI below condition';
+            }
+            
+            # If `while ($a){` , with no space before the brace, insert space
+            if ( $next->previous_sibling == $this ) {
+                my $space = PPI::Token::Whitespace->new(' ');
+                $this->insert_after($space);                
+            }
+        }        
     }
 
     return $count;
