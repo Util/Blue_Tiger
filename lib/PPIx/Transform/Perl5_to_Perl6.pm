@@ -754,7 +754,7 @@ sub _remove_parens_from_conditionals {
     #     PPI::Statement::Expression              $x le $y
     #   PPI::Structure::Block           { ... }   say "He"
 
-    my %wanted = map { $_ => 1 } qw( if elsif unless while );
+    my %wanted = map { $_ => 1 } qw( if elsif unless while until );
 
     my $count = 0;
     for my $compound ( _get_all( $PPI_doc, 'Statement::Compound' ) ) {
