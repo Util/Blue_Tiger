@@ -260,11 +260,11 @@ foreach(my $i = 0; $i < 5; $i++) {print}
 given($foo) {print}
 when($foo) {print}
 # Out:
-if ($foo) {print}
-unless ($foo) {print}
-elsif ($bar) {print}
-while ($foo) {print}
-until ($foo) {print}
+if $foo {print}
+unless $foo {print}
+elsif $bar {print}
+while $foo {print}
+until $foo {print}
 for @foo <-> $_ {print}
 for @foo <-> $_ {print}
 for (my $i = 0; $i < 5; $i++) {print}
@@ -285,11 +285,11 @@ for (my $i = 0; $i < 5; $i++) {print}
 given ($foo) {print}
 when ($foo) {print}
 # Out:
-if ($foo) {print}
-unless ($foo) {print}
-elsif ($bar) {print}
-while ($foo) {print}
-until ($foo) {print}
+if $foo {print}
+unless $foo {print}
+elsif $bar {print}
+while $foo {print}
+until $foo {print}
 for @foo <-> $_ {print}
 for @foo <-> $_ {print}
 for (my $i = 0; $i < 5; $i++) {print}
