@@ -760,7 +760,7 @@ sub _remove_parens_from_conditionals {
     for my $compound ( _get_all( $PPI_doc, 'Statement::Compound' ) ) {
         my @sc = $compound->schildren;
 
-        for my $i ( 0+1 .. $#sc-1 ) { 
+        for my $i ( 0+1 .. $#sc-1 ) {
             my ( $prior, $this, $next ) = @sc[ $i-1, $i, $i+1 ];
 
             next if $this->class ne 'PPI::Structure::Condition';
@@ -794,13 +794,13 @@ sub _remove_parens_from_conditionals {
             else {
                 warn 'XXX Unexpected PPI below condition';
             }
-            
+
             # If `while ($a){` , with no space before the brace, insert space
             if ( $next->previous_sibling == $this ) {
                 my $space = PPI::Token::Whitespace->new(' ');
-                $this->insert_after($space);                
+                $this->insert_after($space);
             }
-        }        
+        }
     }
 
     return $count;
