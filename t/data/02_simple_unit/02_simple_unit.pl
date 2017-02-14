@@ -362,3 +362,9 @@ foreach (@a) {}
 # Out:
 for @a <-> $_ {}
 #---
+# Name: `sub foo { my ($a) = @_; }` becomes `sub foo ($a) { }`
+# In:
+sub foo { my ($a) = @_; }
+# Out:
+sub foo ($a) { }
+#---

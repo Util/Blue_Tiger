@@ -140,6 +140,7 @@ sub _convert_Perl5_PPI_to_Perl6_PPI {
     $change_count += $self->_remove_obsolete_pragmas_and_shbang($PPI_doc);
     $change_count += $self->_optionally_change_qw_to_arrow_quotes($PPI_doc);
     $change_count += $self->_remove_parens_from_conditionals($PPI_doc);
+    $change_count += $self->_move_sub_params_from_at_to_declaration($PPI_doc);
 
     return $change_count;
 }
@@ -804,6 +805,85 @@ sub _remove_parens_from_conditionals {
     }
 
     return $count;
+}
+
+# XXX First pass at this optional refactoring.
+# XXX Needs to handle lots more variations, and recent Perl 5 sub-signatures.
+# XXX Currently fails to inform user about `my ( $first, @rest ) = @_`.
+# XXX Currently fails to process `my @args = @_`.
+sub _move_sub_params_from_at_to_declaration {
+    croak 'Wrong number of arguments passed to method' if @_ != 2;
+    my ( $self, $PPI_doc ) = @_;
+    croak 'Parameter 2 must be a PPI::Document!' if !_INSTANCE($PPI_doc, 'PPI::Document');
+    # PPI::Statement::Sub
+    #   PPI::Token::Word                   'sub'
+    #   PPI::Token::Word                   'abc'
+    #   PPI::Structure::Block              { ... }
+    #     PPI::Statement::Variable
+    #       PPI::Token::Word               'my'
+    #       PPI::Structure::List           ( ... )
+    #         PPI::Statement::Expression
+    #           PPI::Token::Symbol         '$a'
+    #           PPI::Token::Operator       ','
+    #           PPI::Token::Symbol         '$b'
+    #           PPI::Token::Operator       ','
+    #           PPI::Token::Symbol         '$c'
+    #       PPI::Token::Operator           '='
+    #       PPI::Token::Magic              '@_'
+    #       PPI::Token::Structure          ';'
+
+    my $count = 0;
+    for my $sub ( _get_all( $PPI_doc, 'Statement::Sub' ) ) {
+        my ( $sub_word, $sub_name, $block, @junk1 ) = $sub->schildren;
+
+        warn if $sub_word->class   ne 'PPI::Token::Word'
+             or $sub_word->content ne 'sub';
+        warn if $sub_name->class   ne 'PPI::Token::Word';
+        warn if $block   ->class   ne 'PPI::Structure::Block';
+
+        my ($sv, @junk2) = $block->schildren;
+        if ( $sv->class ne 'PPI::Statement::Variable' ) {
+            $self->log_warn(
+                $sv,
+                "sub not given a param definition, "
+               . "because the first statement within the sub was not `my`.\n"
+            );
+            next;
+        }
+
+        my ( $my_word, $list, $op, $underscore, $semi, @rest ) = $sv->schildren;
+        warn if $my_word   ->class   ne 'PPI::Token::Word'
+             or $my_word   ->content ne 'my';
+        if (
+            $list      ->class   ne 'PPI::Structure::List'
+         or $op        ->class   ne 'PPI::Token::Operator'
+         or $op        ->content ne '='
+         or $underscore->class   ne 'PPI::Token::Magic'
+         or $underscore->content ne '@_'
+         or $semi      ->class   ne 'PPI::Token::Structure'
+         or $semi      ->content ne ';'
+        ) {
+            $self->log_warn(
+                $sv,
+                "sub not given a param definition, "
+               . "because the first statement within the sub was `my`, "
+               . "but did not have a structure we recognize (yet).\n"
+            );
+            next;
+        }
+
+        my $space = PPI::Token::Whitespace->new(' ');
+        $sub_name->insert_after($space);
+        $list->remove;
+        # XXX No good way to insert this so that future passes recognize it, unless we add custom types to PPI.
+        $space->insert_after($list);
+        my $sib;
+        while ( $sib = $sv->next_sibling and $sib->class eq 'PPI::Token::Whitespace' ) {
+            $sib->delete or warn;
+        }
+        $sv->delete;
+        $count++;
+    }
 }
 
 sub _optionally_change_qw_to_arrow_quotes {
