@@ -224,6 +224,12 @@ $($foo)
 # Out:
 42
 #---
+# Name: Octal Numbers
+# In:
+042
+# Out:
+0o42
+#---
 # Name: Decimal points: 42.1 -> 42.1 : No change for proper FP
 # In:
 42.1
@@ -267,7 +273,7 @@ while $foo {print}
 until $foo {print}
 for @foo <-> $_ {print}
 for @foo <-> $_ {print}
-for (my $i = 0; $i < 5; $i++) {print}
+loop (my $i = 0; $i < 5; $i++) {print}
 foreach (my $i = 0; $i < 5; $i++) {print}
 given ($foo) {print}
 when ($foo) {print}
@@ -292,7 +298,7 @@ while $foo {print}
 until $foo {print}
 for @foo <-> $_ {print}
 for @foo <-> $_ {print}
-for (my $i = 0; $i < 5; $i++) {print}
+loop (my $i = 0; $i < 5; $i++) {print}
 given ($foo) {print}
 when ($foo) {print}
 #---
@@ -367,4 +373,36 @@ for @a <-> $_ {}
 sub foo { my ($a) = @_; }
 # Out:
 sub foo ($a) { }
+#---
+# Name: Regex modifiers become Adverbs
+# In:
+
+/a/i;
+/a/g;
+/a/ig;
+/a/gi;
+/a/gix;
+/a/x;
+/a/xx;
+# Out:
+
+/:i a/;
+/:g a/;
+/:i :g a/;
+/:i :g a/;
+/:i :g a/;
+/a/;
+/a/;
+#---
+# Name: String Interpolations
+# In:
+print "${a} is $foo{bar} or $arr[$i]";
+# Out:
+print "{$a} is %foo{bar} or @arr[$i]";
+#---
+# Name: print with File handle
+# In:
+print FH "$foo bar";
+# Out:
+FH.print: "$foo bar";
 #---
