@@ -129,7 +129,11 @@ sub _convert_Perl5_PPI_to_Perl6_PPI {
 
     my $change_count = 0;
     $change_count += $self->_translate_all_ops($PPI_doc);
+    $change_count += $self->_change_interpolations($PPI_doc);
     $change_count += $self->_change_sigils($PPI_doc);
+    $change_count += $self->_change_regex($PPI_doc);
+    $change_count += $self->_change_print_fh($PPI_doc);
+    $change_count += $self->_change_octal($PPI_doc);
     $change_count += $self->_change_casts($PPI_doc);
     $change_count += $self->_change_trailing_fp($PPI_doc);
     $change_count += $self->_insert_space_after_keyword($PPI_doc);
@@ -137,6 +141,7 @@ sub _convert_Perl5_PPI_to_Perl6_PPI {
     $change_count += $self->_add_a_comma_after_mapish_blocks($PPI_doc);
     $change_count += $self->_change_mapish_expr_to_block($PPI_doc);
     $change_count += $self->_change_foreach_my_lexvar_to_arrow($PPI_doc);
+    $change_count += $self->_change_c_style_for_to_loop($PPI_doc);
     $change_count += $self->_remove_obsolete_pragmas_and_shbang($PPI_doc);
     $change_count += $self->_optionally_change_qw_to_arrow_quotes($PPI_doc);
     $change_count += $self->_remove_parens_from_conditionals($PPI_doc);
@@ -279,16 +284,122 @@ sub _change_sigils {
     # logic to look at subscripts to figure out the real type of the variable.
     # Handles $foo[5]       -> @foo[5]       (array element),
     #         $foo{$key}    -> %foo{$key}    (hash  element),
+    #         @ARGV         -> @*ARGV
     #     and @foo{'x','y'} -> %foo{'x','y'} (hash  slice  ).
     #
     # No change needed for     @foo[1,5]     (array slice  ).
 
     my $count = 0;
     for my $sym ( _get_all( $PPI_doc, 'Token::Symbol' ) ) {
+	if ($sym->symbol =~ /^\@ARGV$/) {
+	    $sym->set_content( "@*ARGV" );
+            $count++;
+        }
         if ( $sym->raw_type ne $sym->symbol_type ) {
             $sym->set_content( $sym->symbol() );
             $count++;
         }
+    }
+    for my $sym ( _get_all( $PPI_doc, 'Token::ArrayIndex' ) ) {
+	$sym =~ m/\$#(.+)/;
+	my $array = "$1.end";
+	$sym->set_content( ($1 =~ /^ARGV$/ ? "@*" : "@") . $array );
+	$count++;
+    }
+
+    return $count;
+}
+
+sub _change_interpolations {
+    croak 'Wrong number of arguments passed to method' if @_ != 2;
+    my ( $self, $PPI_doc ) = @_;
+    croak 'Parameter 2 must be a PPI::Document!' if !_INSTANCE($PPI_doc, 'PPI::Document');
+
+    # Easy, replace string interpolations
+    # Handles ${var}    -> {$var}
+    #         $foo{bar} -> %foo{bar}
+    #         @foo[$i]  -> @foo[$i]
+
+    my $count = 0;
+    for my $quote ( _get_all( $PPI_doc, 'Token::Quote::Double' ) ) {
+	next unless $quote->interpolations;
+	my $str = $quote->string();
+	$str =~ s/\$\{/{\$/g;
+	$str =~ s/\$(\w+\{)/%$1/g;
+	$str =~ s/\$(ARGV)\b/\@*$1/g;
+	$str =~ s/\$(\w+\[)/\@$1/g;
+	$quote->set_content( "\"$str\"" );
+	$count++;
+    }
+
+    return $count;
+}
+
+sub _change_regex {
+    croak 'Wrong number of arguments passed to method' if @_ != 2;
+    my ( $self, $PPI_doc ) = @_;
+    croak 'Parameter 2 must be a PPI::Document!' if !_INSTANCE($PPI_doc, 'PPI::Document');
+
+    my $count = 0;
+
+    # Move modifiers at the end to the start of regex
+    for my $regex ( _get_all( $PPI_doc, 'Token::Regexp' ) ) {
+	next unless grep(/[xig]/,keys %{$regex->get_modifiers});
+	$_ = $regex->content;
+	for my $mod (keys %{ $regex->get_modifiers}) {
+	    $self->log_warn($regex, "Ignoring regex modifiers but clearing them") if $mod !~ /[xig]/;
+	    s#/$mod(\w*)$#/$1#;
+	    s/^./$&:$mod / if $mod =~ /[ig]/;
+	}
+	$regex->set_content($_);
+    }
+
+    # Handles Error: Unrecognized regex metacharacter
+    for my $regex ( _get_all( $PPI_doc, 'Token::Regexp' ) ) {
+	next unless $regex =~ m/[`\-#=,]/;
+	$regex->set_content( $regex->content =~ s/[`\-#=,]/\\$&/gr);
+	$count++;
+    }
+
+    return $count;
+}
+
+sub _change_print_fh {
+    croak 'Wrong number of arguments passed to method' if @_ != 2;
+    my ( $self, $PPI_doc ) = @_;
+    croak 'Parameter 2 must be a PPI::Document!' if !_INSTANCE($PPI_doc, 'PPI::Document');
+
+    # Changes `print FH "string";` to `FH.print: "string"`
+
+    my $count = 0;
+    for ( _get_all( $PPI_doc, 'Statement' ) ) {
+	my @sc = $_->schildren;
+	next if $sc[0] ne "print" || $sc[1]->class ne "PPI::Token::Word";
+	my @c = $_->children;
+	my $f = shift @c;
+	$f->delete();
+	_eat_optional_whitespace(\@c);
+	$f = shift @c;
+	$f->set_content( $f =~ s/.+/$&.print: /r );
+	$count++;
+    }
+
+    return $count;
+}
+
+sub _change_octal {
+    croak 'Wrong number of arguments passed to method' if @_ != 2;
+    my ( $self, $PPI_doc ) = @_;
+    croak 'Parameter 2 must be a PPI::Document!' if !_INSTANCE($PPI_doc, 'PPI::Document');
+
+    # Easy, ` is a metacharacter in raku so changing ` to \` in regex match
+
+    my $count = 0;
+    for my $num ( _get_all( $PPI_doc, 'Token::Number::Octal' ) ) {
+	$_ = $num;
+	s/^0/0o/;
+	$num->set_content( $_ );
+	$count++;
     }
 
     return $count;
@@ -663,13 +774,64 @@ sub _change_foreach_my_lexvar_to_arrow {
         $sl->start ->set_content('');
         $sl->finish->set_content('');
 
-        $sl->insert_before( PPI::Token::Whitespace->new(' ') );
         $sl->insert_after($_) for reverse (
             PPI::Token::Whitespace->new(' '),
             PPI::Token::Operator  ->new('<->'), # XXX Fixup with log message. In fact, make it an option.
             PPI::Token::Whitespace->new(' '),
             $var,
         );
+
+        $count++;
+    }
+    return $count;
+}
+
+sub _change_c_style_for_to_loop {
+    croak 'Wrong number of arguments passed to method' if @_ != 2;
+    my ( $self, $PPI_doc ) = @_;
+    croak 'Parameter 2 must be a PPI::Document!' if !_INSTANCE($PPI_doc, 'PPI::Document');
+
+    my %wanted_words = map { $_ => 1 } qw( for );
+
+    # XXX Add code to trim the whitespace when parens are removed around something that already has whitespace.
+
+    # Change `for (my $i = 0; $i < 3; $i++) {}` to `loop (my $i = 0; $i < 3; $i++) {}`
+    my $count = 0;
+    for my $statement ( _get_all( $PPI_doc, 'Statement::Compound' ) ) {
+        # Must have this structure:
+        #   PPI::Statement::Compound
+        #     PPI::Token::Word  	'for'
+        #     PPI::Structure::For  	(my $i = 0; $i < 3; $i++) 
+        #       PPI::Statement
+        #         ...
+        # Changing to this new structure:
+        #   PPI::Statement::Compound
+        #     PPI::Token::Word  	'loop'
+        #     PPI::Structure::For  	(my $i = 0; $i < 3; $i++) 
+        #       PPI::Statement
+
+        my @sc = $statement->schildren;
+        next unless @sc and $sc[0] and $sc[0]->class() eq 'PPI::Token::Word'
+                and $wanted_words{ $sc[0]->content };
+        next unless @sc == 3 and $sc[1]->class() eq 'PPI::Structure::For';
+
+        my @c = $statement->children;
+
+        _eat_optional_whitespace(\@c); # XXX Can this really occur here?
+
+        # Change keyword "for" to "loop"
+        # Keyword is not needed in @c after this point.
+        {
+            my $k = shift @c or die;
+            die unless $k->class eq 'PPI::Token::Word' and $wanted_words{ $k->content };
+
+            # $k->replace( PPI::Token::Word->new('loop') ) ; # XXX The ->replace method has not yet been implemented in PPI 1.215.
+            if ( $k->content eq 'for' ) {
+                my $new_k = PPI::Token::Word->new('loop')   or die;
+                $k->insert_after($new_k)                    or die;
+                $k->delete()                                or die;
+            }
+        }
 
         $count++;
     }
@@ -834,12 +996,12 @@ sub _move_sub_params_from_at_to_declaration {
 
     my $count = 0;
     for my $sub ( _get_all( $PPI_doc, 'Statement::Sub' ) ) {
-        my ( $sub_word, $sub_name, $block, @junk1 ) = $sub->schildren;
+	next if $sub->forward;
+	my ($sub_word, $sub_name) = $sub->schildren();
+	my $block = $sub->block();
 
-        warn if $sub_word->class   ne 'PPI::Token::Word'
-             or $sub_word->content ne 'sub';
-        warn if $sub_name->class   ne 'PPI::Token::Word';
-        warn if $block   ->class   ne 'PPI::Structure::Block';
+	my @sc = $sub->schildren;
+	warn if $sub_name->class   ne 'PPI::Token::Word';
 
         my ($sv, @junk2) = $block->schildren;
         if ( $sv->class ne 'PPI::Statement::Variable' ) {
