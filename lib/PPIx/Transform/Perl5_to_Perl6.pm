@@ -344,11 +344,17 @@ sub _change_regex {
 
     # Move modifiers at the end to the start of regex
     for my $regex ( _get_all( $PPI_doc, 'Token::Regexp' ) ) {
-	next unless grep(/[xig]/,keys %{$regex->get_modifiers});
+	my %mods = $regex->get_modifiers;
+	next unless keys %mods;
+
+	$self->log_warn(
+	    $regex,
+	    "Ignoring regex modifiers but clearing them"
+	) if join('',keys %mods) !~ /[xig]+/;
+
 	$_ = $regex->content;
-	for my $mod (keys %{ $regex->get_modifiers}) {
-	    $self->log_warn($regex, "Ignoring regex modifiers but clearing them") if $mod !~ /[xig]/;
-	    s#/$mod(\w*)$#/$1#;
+	s#/\w+$#/#;
+	for my $mod (sort(keys %mods)) {
 	    s/^./$&:$mod / if $mod =~ /[ig]/;
 	}
 	$regex->set_content($_);
@@ -374,13 +380,15 @@ sub _change_print_fh {
     my $count = 0;
     for ( _get_all( $PPI_doc, 'Statement' ) ) {
 	my @sc = $_->schildren;
-	next if $sc[0] ne "print" || $sc[1]->class ne "PPI::Token::Word";
+	next if $sc[0] ne "print" ||
+	@sc < 2 ||
+	$sc[1]->class ne "PPI::Token::Word" ||
+	$sc[1]->literal =~ /if|grep|map/;
 	my @c = $_->children;
 	my $f = shift @c;
 	$f->delete();
 	_eat_optional_whitespace(\@c);
-	$f = shift @c;
-	$f->set_content( $f =~ s/.+/$&.print: /r );
+	$c[0]->set_content( $c[0]->content =~ s/.+/$&.print:/r );
 	$count++;
     }
 
@@ -774,6 +782,7 @@ sub _change_foreach_my_lexvar_to_arrow {
         $sl->start ->set_content('');
         $sl->finish->set_content('');
 
+	$sl->insert_before( PPI::Token::Whitespace->new(' ') );
         $sl->insert_after($_) for reverse (
             PPI::Token::Whitespace->new(' '),
             PPI::Token::Operator  ->new('<->'), # XXX Fixup with log message. In fact, make it an option.
